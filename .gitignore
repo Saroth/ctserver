@@ -1,0 +1,6 @@
+*.swp
+.exvim.*/
+SVR/*
+lib/libdebug.a
+inc/libdebug.h
+

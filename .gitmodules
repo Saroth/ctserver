@@ -1,0 +1,6 @@
+[submodule "cmake"]
+	path = cmake
+	url = https://github.com/Saroth/cmake
+[submodule "debug"]
+	path = debug
+	url = https://github.com/Saroth/debug
