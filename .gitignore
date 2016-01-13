@@ -1,6 +1,8 @@
 *.swp
+*.bac
 .exvim.*/
 SVR/*
+MDLTEST/*
 lib/libdebug.a
 inc/libdebug.h
 
