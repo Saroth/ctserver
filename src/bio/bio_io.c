@@ -1,9 +1,8 @@
+#include <stdio.h>
+
 #include <config.h>
-#include "bio.h"
 
 #if defined(CFG_SYS_UNIX)
-#include <stdio.h>
-#include <errno.h>
 
 static int unix_output(char * buf, int len)
 {

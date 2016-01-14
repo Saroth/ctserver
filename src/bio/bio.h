@@ -75,17 +75,17 @@ BIO_IO_T * bio_io(void);
  * \brief       打开文件接口函数类型
  * \param       path        文件名
  * \param       mode        模式，同fopen的mode参数
- * \param [out] fp          文件指针或句柄
- * \return      0: Success      <0: Error
+ * \param [out] fp          文件句柄，实际为文件指针或句柄
+ * \return      0:Success   <0:Error
  * \detail      如果不支持C标准库的文件操作，则需要解析mode参数。
  *              需要判断fp是否有效，如有效需要先关闭文件。
- *              函数返回的指针或句柄由调用函数管理，需注意重入问题。
+ *              文件句柄由调用函数管理，需注意重入问题。
  */
 typedef int (* BIO_FUNC_FOPEN_T)(char * path, const char * mode, long * fp);
 /**
  * \brief       关闭文件接口函数类型
- * \param  [in] fp          文件指针或句柄
- * \return      0: Success      <0: Error
+ * \param  [in] fp          文件句柄
+ * \return      0:Success   <0:Error
  * \detail      文件未打开返回0 
  *              关闭后需要设置fp为无效值
  */
@@ -94,37 +94,45 @@ typedef int (* BIO_FUNC_FCLOSE_T)(long * fp);
  * \brief       写文件接口函数类型
  * \param  [in] buf         写入的数据
  * \param       len         长度
- * \param       fp          文件指针或句柄
- * \return      0: Success      <0: Error
+ * \param       fp          文件句柄
+ * \return      0:Success   <0:Error
  */
 typedef int (* BIO_FUNC_FWRITE_T)(void * buf, int len, long fp);
 /**
  * \brief       读文件接口函数类型
  * \param [out] buf         读取数据的缓存
  * \param       len         缓存大小
- * \param       fp          文件指针或句柄
- * \return      >=0: 读取长度   <0: Error
+ * \param       fp          文件句柄
+ * \return      >=0:读取长度    <0:Error
  */
 typedef int (* BIO_FUNC_FREAD_T)(void * buf, int len, long fp);
 /**
  * \brief       文件读写指针移动
  * \param       ofs         偏移
  * \param       whence      位置,SEEK_SET,SEEK_CUR,SEEK_END
- * \param       fp          文件指针或句柄
- * \return      >=0: 当前偏移   <0: Error
+ * \param       fp          文件句柄
+ * \return      >=0:当前位置    <0:Error
  */
 typedef int (* BIO_FUNC_FSEEK_T)(long ofs, int whence, long fp);
+/**
+ * \brief       文件截断
+ * \param       path        文件名
+ * \param       length      截断后的文件大小
+ * \return      0:Success   <0:Error
+ */
+typedef int (* BIO_FUNC_TRUNCATE_T)(char * path, long length);
 typedef struct {                        //!< 文件操作接口配置结构体
     char * desc;                        //!< 接口类型描述
     BIO_FUNC_FOPEN_T open;              //!< 打开文件接口函数
     BIO_FUNC_FCLOSE_T close;            //!< 关闭文件接口函数
     BIO_FUNC_FWRITE_T write;            //!< 写文件接口函数
     BIO_FUNC_FREAD_T read;              //!< 读文件接口函数
-    BIO_FUNC_FSEEK_T seek;              //!< 文件指针
+    BIO_FUNC_FSEEK_T seek;              //!< 文件指针移动接口函数
+    BIO_FUNC_TRUNCATE_T truncate;       //!< 文件截断接口函数
 }BIO_FCTL_T;
 /**
  * \brief       初始化接口
- * \param       io           自定义接口结构体指针
+ * \param       io          自定义接口结构体指针
  * \return      0:Success   <0:Error
  */
 int bio_fctl_init(void * io);

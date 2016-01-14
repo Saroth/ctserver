@@ -7,6 +7,10 @@ extern int test_ini(void *p);
 int test_main_entry(int argc, char * argv[])
 {
     dbg_out_W(DS_TM, "TLS_SVR - module test");
+    if(main_init()) {
+        dbg_out_E(DS_TM, "Main init failed!!!");
+        return -1;
+    }
 
     dbg_test_setlist(
         { "bio",                NULL,           test_bio,           },

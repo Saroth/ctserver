@@ -1,8 +1,9 @@
+#include <stdio.h>
 #include <config.h>
 #include "bio.h"
 
 #if defined(CFG_SYS_UNIX)
-#include <stdio.h>
+#include <unistd.h>
 #include <errno.h>
 
 static int unix_close(long * fp)
@@ -53,6 +54,14 @@ static int unix_seek(long ofs, int whence, long fp)
     }
     return ret;
 }
+static int unix_truncate(char * path, long length)
+{
+    int ret = truncate(path, length);
+    if(ret < 0) {
+        dbg_outerr_I(DS_BIO_ERR, "truncate:");
+    }
+    return 0;
+}
 static BIO_FCTL_T s_bio_fctl_unix = {
     .desc       = "Unix standard I/O",
     .open       = unix_open,
@@ -60,6 +69,7 @@ static BIO_FCTL_T s_bio_fctl_unix = {
     .write      = unix_write,
     .read       = unix_read,
     .seek       = unix_seek,
+    .truncate   = unix_truncate,
 };
 #endif /* defined(CONF_SYS_UNIX) */
 
