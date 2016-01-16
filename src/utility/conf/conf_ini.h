@@ -1,8 +1,6 @@
 #ifndef __CONF_INI_H__
 #define __CONF_INI_H__
 
-#include <stdio.h>
-#include <list.h>
 #include <config.h>
 
 #ifdef __cplusplus
@@ -30,12 +28,12 @@ typedef enum {                          //!< 返回值定义
     CONF_INI_RET_UNKNOWN_KEY,           //!< 未知键名
 }CONF_INI_RET_E;
 typedef struct {                        //!< 键信息表结构体
-    const char * name;                  //!< 键名，完全匹配
+    char * name;                        //!< 键名，完全匹配
     unsigned int ofs;                   //!< 键表结构体中的对应成员偏移
 }CONF_INI_KEYTBL_T;
 typedef struct {                        //!< 节信息表结构体
     char * name;                        //!< 节名，匹配部分
-    struct list_head list;              //!< 节数据存储的链表，用于存储多组键表数据
+    struct list_head * list;            //!< 数据存储链表，用于存储多组键表数据
     CONF_INI_KEYTBL_T * keytbl;         //!< 键信息表指针
     unsigned int keytbl_keynum;         //!< 键信息表键数
     unsigned int keytblst_size;         //!< 键表结构体大小
@@ -59,7 +57,7 @@ typedef struct {                        //!< 配置记录结构体(单条键值
  *              可连续加载多个文件。
  *              每行不能超过4096字节，超出部分会被忽略。
  */
-int conf_ini_load(long fp, CONF_INI_SECTBL_T * tbls, int num);
+int conf_ini_load(long fp, CONF_INI_SECTBL_T * tbls, unsigned int num);
 /**
  * \brief       写入多个节表中的所有键表数据到配置文件
  * \param       fp          文件句柄
@@ -69,7 +67,7 @@ int conf_ini_load(long fp, CONF_INI_SECTBL_T * tbls, int num);
  * \detail      文件需要在外部打开，并传入句柄
  *              通过num控制，可以实现将配置分别写入到多个文件
  */
-int conf_ini_save(long fp, CONF_INI_SECTBL_T * tbl, int num);
+int conf_ini_save(long fp, CONF_INI_SECTBL_T * tbl, unsigned int num);
 /**
  * \brief       清除某个表加载的数据
  * \param       tbl         节信息表结构体指针
@@ -83,7 +81,7 @@ int conf_ini_clean(CONF_INI_SECTBL_T * tbl);
  * \param [out] entry       结构体指针
  * \return      0:Success   <0:Error
  */
-int conf_ini_get_entry(CONF_INI_SECTBL_T * tbl, int idx, void ** entry);
+int conf_ini_get_entry(CONF_INI_SECTBL_T * tbl, unsigned int idx, void ** entry);
 /**
  * \brief       获取某类型的节的链表结构体个数
  * \param       tbl         节信息表结构体指针

@@ -4,8 +4,10 @@
 static BIO_INITLIST_T s_bio_initlist[] = {
     { "File control",   NULL,   bio_fctl_init,  (BIO_CHECK)bio_fctl,
         (unsigned long)&((BIO_FCTL_T *)0)->desc,  },
-    { "Input/Output",   NULL,   bio_io_init,  (BIO_CHECK)bio_io,
+    { "Input/Output",   NULL,   bio_io_init,    (BIO_CHECK)bio_io,
         (unsigned long)&((BIO_IO_T *)0)->desc,  },
+    { "Semaphore",      NULL,   bio_sem_init,   (BIO_CHECK)bio_sem,
+        (unsigned long)&((BIO_SEM_T *)0)->desc,  },
 };
 
 int bio_init(void)

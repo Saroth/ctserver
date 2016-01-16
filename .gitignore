@@ -5,4 +5,5 @@ SVR/*
 MDLTEST/*
 lib/libdebug.a
 inc/libdebug.h
+tempfiles/*
 

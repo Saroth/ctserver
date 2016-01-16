@@ -4,12 +4,12 @@
 #include <config.h>
 
 enum INI_ANALYSIS_E{                    //!< 行类型
+    INI_GET_UNRECOGNIZED = 0,           //!< 无法解析数据
+    INI_GET_EMPTY,                      //!< 空行
     INI_GET_KEYVAL,                     //!< 键值
     INI_GET_SECTION,                    //!< 节
     INI_GET_END,                        //!< 文件末尾
-    INI_GET_EMPTY,                      //!< 空行
-    INI_GET_ERROR,                      //!< 错误
-    INI_GET_UNRECOGNISE,                //!< 无法解析数据
+    INI_GET_READ_ERR,                   //!< 错误
 };
 /**
  * \block:      字符解析
@@ -63,7 +63,7 @@ static int ini_line_is_keyval(char * buf)
     if(buf_a == NULL || buf_a == buf        // 无赋值符或无键名
             || (buf_c && buf_c < buf_a)) {  // 注释符在赋值符前
         dbg_out_I(DS_CONF_INI, "No assign char or no key name.");
-        return 0;
+        return INI_GET_UNRECOGNIZED;
     }
     dbg_out_I(DS_CONF_INI, "Get key & value: %s", buf);
     return INI_GET_KEYVAL;
@@ -73,7 +73,7 @@ static int ini_line_is_section(char * buf)
 {
     if(buf[0] != CONF_INI_CHAR_SECTION_HEAD) {
         dbg_out_I(DS_CONF_INI, "No section head char.");
-        return 0;
+        return INI_GET_UNRECOGNIZED;
     }
     char * buf_s = buf + 1;
     char * buf_c = strchr(buf, CONF_INI_CHAR_COMMENT);
@@ -81,13 +81,13 @@ static int ini_line_is_section(char * buf)
     if(buf_e == NULL                        // 无后标记符
             || (buf_c && buf_c < buf_e)) {  // 注释符在后标记符前
         dbg_out_I(DS_CONF_INI, "No section end char.");
-        return 0;
+        return INI_GET_UNRECOGNIZED;
     }
     *buf_e = 0;
     int len = str_trim(buf_s);
     if(len == 0) {
-        dbg_out_I(DS_CONF_INI, "No section name.");
-        return INI_GET_UNRECOGNISE;     //!< 非法语句，缓存数据已被修改
+        dbg_out_W(DS_CONF_INI_ERR, "No section name.");
+        return INI_GET_EMPTY;               //!< 非法语句，缓存数据已被修改
     }
     memmove(buf, buf_s, len);
     buf[len] = 0;
@@ -104,7 +104,7 @@ static int ini_line_read(long fp, char * buf)
         ret = bio_fctl()->read(buf_p, 1, fp);
         if(ret < 0 || ret > 1) {
             dbg_out_E(DS_CONF_INI_ERR, "Read file failed, ret:%d", ret);
-            return INI_GET_ERROR;
+            return INI_GET_READ_ERR;
         }
         if(ret == 0 || *buf_p == '\n') {
             if(ret == 0 && buf_p == buf) {
@@ -115,7 +115,7 @@ static int ini_line_read(long fp, char * buf)
         }
         buf_p++;
     }
-    dbg_out_I(DS_CONF_INI, "buf: %s", buf);
+    dbg_out_I(DS_CONF_INI, "#### buf: %s", buf);
     /// 字符解析
     if(str_trim(buf) == 0) {
         dbg_out_I(DS_CONF_INI, "Empty line.");
@@ -127,7 +127,8 @@ static int ini_line_read(long fp, char * buf)
     if((ret = ini_line_is_keyval(buf))) {
         return ret;
     }
-    return INI_GET_UNRECOGNISE;
+    dbg_out_W(DS_CONF_INI_ERR, "Unrecognized line: %s", buf);
+    return INI_GET_UNRECOGNIZED;
 }
 /** @} */
 /**
@@ -164,7 +165,7 @@ static int ini_add_section(char * buf, CONF_INI_SECTBL_T * tbls,
     struct list_head * ptr = (struct list_head *)((unsigned long)(*addr)
             + tbls->keytblst_ptr_ofs);
     /// 添加结构体到链表
-    list_add_tail(ptr, &tbls->list);
+    list_add_tail(ptr, tbls->list);
     dbg_out_I(DS_CONF_INI_MEM, "Add section: %d, malloc:%#x, size:%d, ptr: %#x",
             i, *addr, tbls->keytblst_size, ptr);
     return i;
@@ -210,8 +211,9 @@ static int ini_add_keyval(char * buf, CONF_INI_SECTBL_T * tbl, void * addr)
 
     return 0;
 }
+
 /** 加载配置文件 */
-int conf_ini_load(long fp, CONF_INI_SECTBL_T * tbls, int num)
+int conf_ini_load(long fp, CONF_INI_SECTBL_T * tbls, unsigned int num)
 {
     int ret;
     char buf[4096];
@@ -234,15 +236,15 @@ int conf_ini_load(long fp, CONF_INI_SECTBL_T * tbls, int num)
             case INI_GET_KEYVAL: {
                 if(tbl) {
                     ret = ini_add_keyval(buf, tbl, addr);
-                    if(ret == 0 || ret != CONF_INI_RET_UNKNOWN_KEY) {
+                    if(ret && ret != CONF_INI_RET_UNKNOWN_KEY) {
                         return ret;     //!< 反馈未知键名之外的所有错误
                     }
                 }
                 break;
             }
-            case INI_GET_ERROR: { return CONF_INI_RET_READ_ERR; }
+            case INI_GET_READ_ERR: { return CONF_INI_RET_READ_ERR; }
             case INI_GET_END: { return 0; }
-            case INI_GET_UNRECOGNISE:
+            case INI_GET_UNRECOGNIZED:
             case INI_GET_EMPTY:
             default: break;
         }
@@ -250,7 +252,7 @@ int conf_ini_load(long fp, CONF_INI_SECTBL_T * tbls, int num)
     return 0;
 }
 /** 写入多个节表中的所有键表数据到配置文件 */
-int conf_ini_save(long fp, CONF_INI_SECTBL_T * tbl, int num)
+int conf_ini_save(long fp, CONF_INI_SECTBL_T * tbl, unsigned int num)
 {
     return 0;
 }
@@ -258,7 +260,7 @@ int conf_ini_save(long fp, CONF_INI_SECTBL_T * tbl, int num)
 int conf_ini_clean(CONF_INI_SECTBL_T * tbl)
 {
     struct list_head * ptr = NULL;
-    struct list_head * head = &tbl->list;
+    struct list_head * head = tbl->list;
     dbg_out_I(DS_CONF_INI_MEM, "Clean list: %s", tbl->name);
     /// 遍历所有节点
     list_for_each(ptr, head) {
@@ -280,11 +282,11 @@ int conf_ini_clean(CONF_INI_SECTBL_T * tbl)
     return 0;
 }
 /** 获取某类型的节的链表中，某个结构体指针 */
-int conf_ini_get_entry(CONF_INI_SECTBL_T * tbl, int idx, void ** entry)
+int conf_ini_get_entry(CONF_INI_SECTBL_T * tbl, unsigned int idx, void ** entry)
 {
     int i = 0;
     struct list_head *ptr = NULL;
-    list_for_each(ptr, &tbl->list) {
+    list_for_each(ptr, tbl->list) {
         if(idx == i++) {
             *entry = (void *)((unsigned long)ptr - tbl->keytblst_ptr_ofs);
             dbg_out_I(DS_CONF_INI, "Get entry:%#x, idx:%d, ptr:%#x",
@@ -300,7 +302,7 @@ int conf_ini_get_size(CONF_INI_SECTBL_T * tbl)
 {
     int num = 0;
     struct list_head *ptr = NULL;
-    list_for_each(ptr, &tbl->list) {
+    list_for_each(ptr, tbl->list) {
         num++;
     }
     return num;

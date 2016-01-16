@@ -69,51 +69,51 @@ int bio_io_init(void * p);
 BIO_IO_T * bio_io(void);
 /** @} */
 /**
- * \block:      文件操作
+ * \block:      File control
  * @{ */
 /**
  * \brief       打开文件接口函数类型
  * \param       path        文件名
  * \param       mode        模式，同fopen的mode参数
- * \param [out] fp          文件句柄，实际为文件指针或句柄
+ * \param [out] hdl         文件句柄指针，用于存放文件指针或句柄
  * \return      0:Success   <0:Error
  * \detail      如果不支持C标准库的文件操作，则需要解析mode参数。
- *              需要判断fp是否有效，如有效需要先关闭文件。
+ *              需要判断hdl是否有效，如有效需要先关闭文件。
  *              文件句柄由调用函数管理，需注意重入问题。
  */
-typedef int (* BIO_FUNC_FOPEN_T)(char * path, const char * mode, long * fp);
+typedef int (* BIO_FUNC_FOPEN_T)(char * path, const char * mode, long * hdl);
 /**
  * \brief       关闭文件接口函数类型
- * \param  [in] fp          文件句柄
+ * \param [i/o] hdl         文件句柄指针
  * \return      0:Success   <0:Error
  * \detail      文件未打开返回0 
- *              关闭后需要设置fp为无效值
+ *              关闭后需要设置hdl为无效值
  */
-typedef int (* BIO_FUNC_FCLOSE_T)(long * fp);
+typedef int (* BIO_FUNC_FCLOSE_T)(long * hdl);
 /**
  * \brief       写文件接口函数类型
  * \param  [in] buf         写入的数据
  * \param       len         长度
- * \param       fp          文件句柄
+ * \param       hdl         文件句柄
  * \return      0:Success   <0:Error
  */
-typedef int (* BIO_FUNC_FWRITE_T)(void * buf, int len, long fp);
+typedef int (* BIO_FUNC_FWRITE_T)(void * buf, int len, long hdl);
 /**
  * \brief       读文件接口函数类型
  * \param [out] buf         读取数据的缓存
  * \param       len         缓存大小
- * \param       fp          文件句柄
+ * \param       hdl         文件句柄
  * \return      >=0:读取长度    <0:Error
  */
-typedef int (* BIO_FUNC_FREAD_T)(void * buf, int len, long fp);
+typedef int (* BIO_FUNC_FREAD_T)(void * buf, int len, long hdl);
 /**
  * \brief       文件读写指针移动
  * \param       ofs         偏移
  * \param       whence      位置,SEEK_SET,SEEK_CUR,SEEK_END
- * \param       fp          文件句柄
+ * \param       hdl         文件句柄
  * \return      >=0:当前位置    <0:Error
  */
-typedef int (* BIO_FUNC_FSEEK_T)(long ofs, int whence, long fp);
+typedef int (* BIO_FUNC_FSEEK_T)(long ofs, int whence, long hdl);
 /**
  * \brief       文件截断
  * \param       path        文件名
@@ -141,6 +141,73 @@ int bio_fctl_init(void * io);
  * \return      接口结构体指针
  */
 BIO_FCTL_T * bio_fctl(void);
+/** @} */
+/**
+ * \block:      Semaphore
+ * @{ */
+/**
+ * \brief       创建信号量集
+ * \param       num         信号量数
+ * \param       val         初始值
+ * \param [out] hdl         句柄指针
+ * \return      0:Success   <0:Error
+ */
+typedef int (* BIO_FUNC_SEM_NEW)(unsigned short num, int val, long * hdl);
+/**
+ * \brief       删除信号量集
+ * \param [i/o] hdl         句柄指针
+ * \return      0:Success   <0:Error
+ */
+typedef int (* BIO_FUNC_SEM_DEL)(long * hdl);
+/**
+ * \brief       挂起
+ * \param       num         信号量编号
+ * \param       hdl         句柄
+ * \return      0:Success   <0:Error
+ */
+typedef int (* BIO_FUNC_SEM_P)(unsigned short num, long hdl);
+/**
+ * \brief       释放
+ * \param       num         信号量编号
+ * \param       hdl         句柄
+ * \return      0:Success   <0:Error
+ */
+typedef int (* BIO_FUNC_SEM_V)(unsigned short num, long hdl);
+/**
+ * \brief       取值
+ * \param       num         信号量编号
+ * \param       hdl         句柄
+ * \return      0:Success   <0:Error
+ */
+typedef int (* BIO_FUNC_SEM_VAL)(unsigned short num, long hdl);
+/**
+ * \brief       设值
+ * \param       num         信号量编号
+ * \param       val         值
+ * \param       hdl         句柄
+ * \return      0:Success   <0:Error
+ */
+typedef int (* BIO_FUNC_SEM_SETVAL)(unsigned short num, int val, long hdl);
+typedef struct {                        //!< 信号量操作接口配置结构体
+    char * desc;                        //!< 接口类型描述
+    BIO_FUNC_SEM_NEW new;               //!< 创建信号量集接口函数
+    BIO_FUNC_SEM_DEL del;               //!< 删除信号量集接口函数
+    BIO_FUNC_SEM_P p;                   //!< 挂起信号量接口函数
+    BIO_FUNC_SEM_V v;                   //!< 释放信号量接口函数
+    BIO_FUNC_SEM_VAL val;               //!< 获取信号量值接口函数
+    BIO_FUNC_SEM_SETVAL setval;         //!< 设置信号量值接口函数
+}BIO_SEM_T;
+/**
+ * \brief       初始化接口
+ * \param       io          自定义接口结构体指针
+ * \return      0:Success   <0:Error
+ */
+int bio_sem_init(void * io);
+/**
+ * \brief       获取信号量集操作接口结构体
+ * \return      接口结构体指针
+ */
+BIO_SEM_T * bio_sem(void);
 /** @} */
 
 #ifdef __cplusplus
