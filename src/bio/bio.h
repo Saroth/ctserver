@@ -145,14 +145,16 @@ BIO_FCTL_T * bio_fctl(void);
 /**
  * \block:      Semaphore
  * @{ */
+#define BIO_SEM_RETRY_WITH_NEW_ID   //!< 信号量已存在时，使用新ID重新申请
 /**
  * \brief       创建信号量集
+ * \param       name        用于获取key的文件名或信号量名
  * \param       num         信号量数
  * \param       val         初始值
  * \param [out] hdl         句柄指针
  * \return      0:Success   <0:Error
  */
-typedef int (* BIO_FUNC_SEM_NEW)(unsigned short num, int val, long * hdl);
+typedef int (* BIO_FUNC_SEM_NEW)(char * name, int num, int val, long * hdl);
 /**
  * \brief       删除信号量集
  * \param [i/o] hdl         句柄指针
@@ -160,26 +162,32 @@ typedef int (* BIO_FUNC_SEM_NEW)(unsigned short num, int val, long * hdl);
  */
 typedef int (* BIO_FUNC_SEM_DEL)(long * hdl);
 /**
+ * \brief       强制删除信号量集
+ * \param       name        用于获取key的文件名或信号量名
+ * \return      0:Success   <0:Error
+ */
+typedef int (* BIO_FUNC_SEM_FDEL)(char * name);
+/**
  * \brief       挂起
  * \param       num         信号量编号
  * \param       hdl         句柄
  * \return      0:Success   <0:Error
  */
-typedef int (* BIO_FUNC_SEM_P)(unsigned short num, long hdl);
+typedef int (* BIO_FUNC_SEM_P)(int num, long hdl);
 /**
  * \brief       释放
  * \param       num         信号量编号
  * \param       hdl         句柄
  * \return      0:Success   <0:Error
  */
-typedef int (* BIO_FUNC_SEM_V)(unsigned short num, long hdl);
+typedef int (* BIO_FUNC_SEM_V)(int num, long hdl);
 /**
  * \brief       取值
  * \param       num         信号量编号
  * \param       hdl         句柄
  * \return      0:Success   <0:Error
  */
-typedef int (* BIO_FUNC_SEM_VAL)(unsigned short num, long hdl);
+typedef int (* BIO_FUNC_SEM_VAL)(int num, long hdl);
 /**
  * \brief       设值
  * \param       num         信号量编号
@@ -187,7 +195,7 @@ typedef int (* BIO_FUNC_SEM_VAL)(unsigned short num, long hdl);
  * \param       hdl         句柄
  * \return      0:Success   <0:Error
  */
-typedef int (* BIO_FUNC_SEM_SETVAL)(unsigned short num, int val, long hdl);
+typedef int (* BIO_FUNC_SEM_SETVAL)(int num, int val, long hdl);
 typedef struct {                        //!< 信号量操作接口配置结构体
     char * desc;                        //!< 接口类型描述
     BIO_FUNC_SEM_NEW new;               //!< 创建信号量集接口函数
@@ -196,6 +204,7 @@ typedef struct {                        //!< 信号量操作接口配置结构�
     BIO_FUNC_SEM_V v;                   //!< 释放信号量接口函数
     BIO_FUNC_SEM_VAL val;               //!< 获取信号量值接口函数
     BIO_FUNC_SEM_SETVAL setval;         //!< 设置信号量值接口函数
+    BIO_FUNC_SEM_FDEL fdel;             //!< 强制删除信号量集接口函数
 }BIO_SEM_T;
 /**
  * \brief       初始化接口

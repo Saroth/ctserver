@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <config.h>
 
 static BIO_INITLIST_T s_bio_initlist[] = {

@@ -1,6 +1,4 @@
-#include <stdio.h>
 #include <config.h>
-#include "bio.h"
 
 #if defined(CFG_SYS_UNIX)
 #include <unistd.h>

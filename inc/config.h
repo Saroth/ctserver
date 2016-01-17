@@ -41,12 +41,14 @@
 /**
  * \block:      include
  * @{ */
-#include "list/list.h"
+#include <stdio.h>
 
+#include "list/list.h"
 #include "../src/bio/bio.h"
 #include "../src/pool/pool.h"
 
 #include "../src/utility/conf/conf_ini.h"
+#include "../src/utility/crc/crc32.h"
 #include "../src/utility/buffer/buffer.h"
 
 #include "../src/core/core.h"

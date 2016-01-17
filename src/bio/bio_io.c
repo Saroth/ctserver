@@ -1,5 +1,3 @@
-#include <stdio.h>
-
 #include <config.h>
 
 #if defined(CFG_SYS_UNIX)
