@@ -170,10 +170,11 @@ typedef int (* BIO_FUNC_SEM_FDEL)(char * name);
 /**
  * \brief       挂起
  * \param       num         信号量编号
+ * \param       wait        等待时间参数 -1:wait,0:nowait,~:waittime(s)
  * \param       hdl         句柄
  * \return      0:Success   <0:Error
  */
-typedef int (* BIO_FUNC_SEM_P)(int num, long hdl);
+typedef int (* BIO_FUNC_SEM_P)(int num, long wait, long hdl);
 /**
  * \brief       释放
  * \param       num         信号量编号

@@ -3,13 +3,24 @@
 
 #include <config.h>
 
-#define BUFFER_BLOCK_SIZE   0x40000     //!< 每次申请内存块大小
+/*
+ * \brief       数据缓存
+ *              用于临时存放缓存数据。
+ *              初始空间为0，数据存入时，如果空间不足，则申请一个新块。
+ *              空间总量达到上限时不再申请新块，新存入的数据将覆盖最旧的数据。
+ */
+
+#define BUFFER_BLOCK_SIZE   0x10000     //!< 每次申请内存块大小
 #define BUFFER_BLOCK_NUM    64          //!< 块数量
 #define BUFFER_BIG_BLOCK_NUM    64      //!< 大块数量
-
+#define BUFFER_MAXSIZE \
+    (BUFFER_BLOCK_SIZE * BUFFER_BLOCK_NUM * BUFFER_BIG_BLOCK_NUM) //!< 内存上限
 typedef enum {                          //!< 返回值定义
     CONF_BUFFER_RET = ERR_CODE_BUFFER,  //!< 起始码
     CONF_BUFFER_RET_MEM,                //!< 内存申请错误，或内存不足
+    CONF_BUFFER_RET_DATALOST,           //!< 数据已失效
+    CONF_BUFFER_RET_PARAM_ERR,          //!< 参数错误或超出范围
+    CONF_BUFFER_RET_SEM_ERR,            //!< 信号量集申请失败
 }BUFFER_RET_E;
 
 /**
@@ -20,9 +31,9 @@ typedef enum {                          //!< 返回值定义
 int buf_new(unsigned int limit, long * p);
 int buf_del(long * p);
 int buf_append(char * buf, unsigned int length, long p);
-unsigned int buf_get(char * buf, unsigned int length, long p);
-unsigned int buf_get_count(long p);
+int buf_get(char * buf, unsigned int length, long long pos, long p);
 int buf_update(char * buf, unsigned int length, long long pos, long p);
+long long buf_get_count(long p);
 
 #endif /* __BUFFER_H__ */
 

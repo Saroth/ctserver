@@ -5,8 +5,6 @@ int test_bio_sem(void *p)
 {
     int ret = 0;
     long hdl = 0;
-
-    dbg_out_I(DS_TM, "Sem init: num:5 val:3");
     while(1) {
         dbg_out_I(DS_TM, "####");
         dbg_out_I(DS_TM, "1.New");
@@ -50,7 +48,10 @@ int test_bio_sem(void *p)
                 dbg_out_I(DS_TM, " >> Input sem number:");
                 int num = dbg_in();
                 dbg_out_I(DS_TM, " << Get sem number: %d", num);
-                ret = bio_sem()->p(num, hdl);
+                dbg_out_I(DS_TM, " >> Set time:(-1:Forever, 0:noWait)");
+                int time = dbg_in();
+                dbg_out_I(DS_TM, " << Get time: %d", time);
+                ret = bio_sem()->p(num, time, hdl);
                 dbg_out_I(DS_TM, "Return: %d", ret);
                 break;
             }
@@ -92,6 +93,49 @@ int test_bio_sem(void *p)
 
 int test_bio_file(void *p)
 {
+    int ret;
+    long hdl = 0;
+    while(1) {
+        dbg_out_I(DS_TM, "####");
+        dbg_out_I(DS_TM, "1.Open");
+        dbg_out_I(DS_TM, "2.Close");
+        dbg_out_I(DS_TM, "3.Write");
+        dbg_out_I(DS_TM, "4.Read");
+        dbg_out_I(DS_TM, "5.Seek");
+        dbg_out_I(DS_TM, "6.Truncate");
+        switch(dbg_in()) {
+            case 1: {
+                char name[256] = { 0 };
+                dbg_out_I(DS_TM, "Input file name:");
+                dbg_in_S(name, 256);
+                dbg_out_I(DS_TM, "Get name:%s", name);
+                ret = bio_fctl()->open(name, "ab+", &hdl);
+                dbg_out_I(DS_TM, "Return: %d", ret);
+                break;
+            }
+            case 2: {
+                dbg_out_I(DS_TM, "Close...");
+                ret = bio_fctl()->close(&hdl);
+                dbg_out_I(DS_TM, "Return: %d", ret);
+                break;
+            }
+            case 3: {
+                break;
+            }
+            case 4: {
+                break;
+            }
+            case 5: {
+                break;
+            }
+            case 6: {
+                break;
+            }
+            case 0: {
+                return 0;
+            }
+        }
+    }
     return 0;
 }
 

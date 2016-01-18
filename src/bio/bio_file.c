@@ -69,7 +69,7 @@ static BIO_FCTL_T s_bio_fctl_unix = {
     .seek       = unix_seek,
     .truncate   = unix_truncate,
 };
-#endif /* defined(CONF_SYS_UNIX) */
+#endif /* defined(CFG_SYS_UNIX) */
 
 static BIO_FCTL_T * s_bio_fctl = NULL;
 int bio_fctl_init(void * p)

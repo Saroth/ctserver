@@ -31,7 +31,7 @@ static BIO_IO_T s_bio_io_unix = {
     .output = unix_output,
     .input  = unix_input,
 };
-#endif /* defined(CONF_SYS_UNIX) */
+#endif /* defined(CFG_SYS_UNIX) */
 
 static BIO_IO_T * s_bio_io = NULL;
 int bio_io_init(void * p)
