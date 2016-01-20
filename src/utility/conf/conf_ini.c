@@ -157,7 +157,7 @@ static int ini_add_section(char * buf, CONF_INI_SECTBL_T * tbls,
     }
     *addr = malloc(tbls->keytblst_size);
     if(*addr == NULL) {
-        dbg_outerr_I(DS_CONF_INI_ERR, "malloc");
+        dbg_outerr_E(DS_CONF_INI_ERR, "malloc");
         return CONF_INI_RET_MEM;
     }
     /// 申请新的结构体
@@ -199,7 +199,7 @@ static int ini_add_keyval(char * buf, CONF_INI_SECTBL_T * tbl, void * addr)
     /// 申请存储空间
     char * val = (char *)malloc(strlen(buf_v) + 4);
     if(val == NULL) {
-        dbg_outerr_I(DS_CONF_INI_ERR, "malloc");
+        dbg_outerr_E(DS_CONF_INI_ERR, "malloc");
         return CONF_INI_RET_MEM;
     }
     /// 将空间地址保存到结构体

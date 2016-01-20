@@ -3,6 +3,7 @@
 
 extern int test_bio(void *p);
 extern int test_ini(void *p);
+extern int test_buffer(void *p);
 
 int test_main_entry(int argc, char * argv[])
 {
@@ -13,8 +14,9 @@ int test_main_entry(int argc, char * argv[])
     }
 
     dbg_test_setlist(
-        { "bio",                NULL,           test_bio,           },
-        { "ini parse",          NULL,           test_ini,           },
+        { "bio",        NULL,   test_bio, },
+        { "ini parse",  NULL,   test_ini, },
+        { "buffer",     NULL,   test_buffer, },
         )
 
     return 0;

@@ -25,15 +25,40 @@ typedef enum {                          //!< 返回值定义
 
 /**
  * \brief       初始化数据缓存
- * \param       limit       缓存上限
+ * \param       limit       缓存上限，自动补齐为内存块倍数
+ * \param       p           缓存结构体指针地址
  * \return      >0:缓存结构体指针   <=0:Error code:BUFFER_RET_E
  */
 int buf_new(unsigned int limit, long * p);
+/**
+ * \brief       删除数据缓存
+ * \param       p           缓存结构体指针地址
+ * \return      0:Success   <0:Error code:BUFFER_RET_E
+ */
 int buf_del(long * p);
+/**
+ * \brief       添加数据到缓存
+ * \param       buf         数据缓存
+ * \param       length      长度
+ * \param       p           缓存结构体指针
+ * \return      0:Success   <0:Error code:BUFFER_RET_E
+ */
 int buf_append(char * buf, unsigned int length, long p);
-int buf_get(char * buf, unsigned int length, long long pos, long p);
-int buf_update(char * buf, unsigned int length, long long pos, long p);
-long long buf_get_count(long p);
+/**
+ * \brief       读取数据
+ * \param       buf         数据缓存
+ * \param       length      长度
+ * \param       pos         读取位置
+ * \param       p           缓存结构体指针
+ * \return      0:Success   <0:Error code:BUFFER_RET_E
+ */
+int buf_read(char * buf, unsigned int length, long long pos, long p);
+/**
+ * \brief       获取数据长度
+ * \param       p           缓存结构体指针
+ * \return      0:Success   <0:Error code:BUFFER_RET_E
+ */
+unsigned long long buf_size(long p);
 
 #endif /* __BUFFER_H__ */
 

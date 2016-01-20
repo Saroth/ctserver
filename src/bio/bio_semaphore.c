@@ -13,13 +13,12 @@ union semun {
     struct seminfo  *__buf;  /* Buffer for IPC_INFO
                                (Linux-specific) */
 };
-#define BIO_UNIX_SEM_ID 0x1             //!< 获取key时使用的ID，[0, 0xff]
 typedef struct {                        //!< 信号量集信息结构体
     int key;                            //!< 用于申请信号量集的key
     int id;                             //!< 申请获得的信号量集id
     int num;                            //!< 信号量集的信号量数
 }BIO_SEM_HDL_T;
-
+static unsigned int s_bio_sem_id = 0x1;     //!< 获取key时使用的ID
 static inline int unix_sem_p(int num, long wait, long hdl)
 {
     BIO_SEM_HDL_T * sem = (BIO_SEM_HDL_T *)hdl;
@@ -39,11 +38,11 @@ static inline int unix_sem_p(int num, long wait, long hdl)
     //     tp = &t;
     // }
     // if(semtimedop(sem->id, &sb, 1, tp) < 0) {
-    //     dbg_outerr_I(DS_SEM_ERR, "semtimedop, wait:%d", wait);
+    //     dbg_outerr_E(DS_SEM_ERR, "semtimedop, wait:%d", wait);
     //     return -1;
     // }
     if(semop(sem->id, &sb, 1) < 0) {
-        dbg_outerr_I(DS_SEM_ERR, "semop, wait:%d", wait);
+        dbg_outerr_E(DS_SEM_ERR, "semop, wait:%d", wait);
         return -1;
     }
     return 0;
@@ -56,7 +55,7 @@ static inline int unix_sem_v(int num, long hdl)
     sb.sem_op = 1;
     sb.sem_flg = SEM_UNDO;
     if(semop(sem->id, &sb, 1) < 0) {
-        dbg_outerr_I(DS_SEM_ERR, "semop, V, num:%d", sb.sem_num);
+        dbg_outerr_E(DS_SEM_ERR, "semop, V, num:%d", sb.sem_num);
         return -1;
     }
     return 0;
@@ -66,7 +65,7 @@ static int unix_sem_val(int num, long hdl)
     BIO_SEM_HDL_T * sem = (BIO_SEM_HDL_T *)hdl;
     int ret = semctl(sem->id, num, GETVAL);
     if(ret < 0) {
-        dbg_outerr_I(DS_SEM_ERR, "semctl, GETVAL, id:%d num:%d", sem->id, num);
+        dbg_outerr_E(DS_SEM_ERR, "semctl, GETVAL, id:%d num:%d", sem->id, num);
     }
     return ret;
 }
@@ -77,7 +76,7 @@ static int unix_sem_setval(int num, int val, long hdl)
     arg.val = val;
     int ret = semctl(sem->id, num, SETVAL, arg);
     if(ret < 0) {
-        dbg_outerr_I(DS_SEM_ERR, "semctl, SETVAL, id:%d num:%d, val:%d",
+        dbg_outerr_E(DS_SEM_ERR, "semctl, SETVAL, id:%d num:%d, val:%d",
                 sem->id, num, val);
     }
     return ret;
@@ -86,27 +85,29 @@ static int sem_new(char * name, int num, int val, int id, int mode, long * hdl)
 {
     BIO_SEM_HDL_T * sem = (BIO_SEM_HDL_T *)malloc(sizeof(BIO_SEM_HDL_T));
     if(sem == NULL) {
-        dbg_outerr_I(DS_SEM_ERR, "malloc");
+        dbg_outerr_E(DS_SEM_ERR, "malloc");
         return -1;
     }
     memset(sem, 0x00, sizeof(BIO_SEM_HDL_T));
     do {
         sem->key = ftok(name, id);       //!< 获取key
         if(sem->key < 0) {
-            dbg_outerr_I(DS_SEM_ERR, "ftok");
+            dbg_outerr_E(DS_SEM_ERR, "ftok");
             return -1;
         }
         sem->id = semget(sem->key, num, mode);
         if(sem->id > 0) {
+            s_bio_sem_id = id + 1;      //!< 递增ID,用于下次申请
             break;                      //!< 获得信号量集id
         }
-        dbg_outerr_I(DS_SEM_ERR, "semget, key:%x, ID:%d", sem->key, id);
+        dbg_outerr_W(DS_SEM_ERR, "semget, key:%x, ID:%d", sem->key, id);
 #ifdef BIO_SEM_RETRY_WITH_NEW_ID
-        if(errno == EEXIST && id++ < BIO_UNIX_SEM_ID + 0x10) {
+        if(errno == EEXIST && id++ < 0xFF) {
             dbg_out_W(DS_SEM_ERR, "Retry ID: %d", id);
             continue;                   //!< 使用新ID重试
         }
 #endif /* BIO_SEM_RETRY_WITH_NEW_ID */
+        dbg_out_E(DS_SEM_ERR, "Get semaphore failed!");
         return -1;
     } while(1);
     int i = 0;
@@ -123,7 +124,7 @@ static int sem_new(char * name, int num, int val, int id, int mode, long * hdl)
 }
 static int unix_sem_new(char * name, int num, int val, long * hdl)
 {
-    return sem_new(name, num, val, BIO_UNIX_SEM_ID,
+    return sem_new(name, num, val, s_bio_sem_id,
             0666 | IPC_CREAT | IPC_EXCL, hdl);
 }
 static int unix_sem_del(long * hdl)
@@ -135,7 +136,7 @@ static int unix_sem_del(long * hdl)
     }
     dbg_out_I(DS_SEM, "Delete semaphore, id:%d, key:%x", sem->id, sem->key);
     if(semctl(sem->id, 0, IPC_RMID) < 0) {
-        dbg_outerr_I(DS_SEM_ERR, "semctl, IPC_RMID");
+        dbg_outerr_E(DS_SEM_ERR, "semctl, IPC_RMID");
         return -1;
     }
     free(sem);
@@ -145,10 +146,10 @@ static int unix_sem_del(long * hdl)
 static int unix_sem_fdel(char * name)
 {
     long hdl;
-    int i = BIO_UNIX_SEM_ID;
+    int i = 0x1;
     dbg_out_I(DS_SEM, "Force delete semaphore, create by: %s", name);
 #ifdef BIO_SEM_RETRY_WITH_NEW_ID
-    for(; i < BIO_UNIX_SEM_ID + 0x10; i++)
+    for(; i < 0xFF; i++)
 #endif /* BIO_SEM_RETRY_WITH_NEW_ID */
     {
         if(sem_new(name, 1, 1, i, IPC_EXCL, &hdl) == 0) {

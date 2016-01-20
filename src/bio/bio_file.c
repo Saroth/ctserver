@@ -8,7 +8,7 @@ static int unix_close(long * hdl)
 {
     if(*hdl) {
         if(fclose((FILE *)*hdl)) {
-            dbg_outerr_I(DS_BIO_ERR, "fclose");
+            dbg_outerr_E(DS_BIO_ERR, "fclose");
         }
         *hdl = (long)NULL;
     }
@@ -19,7 +19,7 @@ static int unix_open(char * path, const char * mode, long * hdl)
     unix_close(hdl);
     *hdl = (long)fopen(path, mode);
     if(*hdl == (long)NULL) {
-        dbg_outerr_I(DS_BIO_ERR, "fopen");
+        dbg_outerr_E(DS_BIO_ERR, "fopen");
         return -1;
     }
     return 0;
@@ -27,7 +27,7 @@ static int unix_open(char * path, const char * mode, long * hdl)
 static int unix_write(void * buf, int len, long hdl)
 {
     if(fwrite(buf, 1, len, (FILE *)hdl) != len) {
-        dbg_outerr_I(DS_BIO_ERR, "fwrite");
+        dbg_outerr_E(DS_BIO_ERR, "fwrite");
         return -1;
     }
     return 0;
@@ -39,7 +39,7 @@ static int unix_read(void * buf, int len, long hdl)
         dbg_out_W(DS_BIO_ERR, "End of file");
     }
     else if(ret < 0) {
-        dbg_outerr_I(DS_BIO_ERR, "fread");
+        dbg_outerr_E(DS_BIO_ERR, "fread");
         return -1;
     }
     return ret;
@@ -48,7 +48,7 @@ static int unix_seek(long ofs, int whence, long hdl)
 {
     int ret = fseek((FILE *)hdl, ofs, whence);
     if(ret < 0) {
-        dbg_outerr_I(DS_BIO_ERR, "fseek");
+        dbg_outerr_E(DS_BIO_ERR, "fseek");
     }
     return ret;
 }
@@ -56,7 +56,7 @@ static int unix_truncate(char * path, long length)
 {
     int ret = truncate(path, length);
     if(ret < 0) {
-        dbg_outerr_I(DS_BIO_ERR, "truncate");
+        dbg_outerr_E(DS_BIO_ERR, "truncate");
     }
     return 0;
 }
