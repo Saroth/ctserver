@@ -4,8 +4,9 @@
 extern int test_bio(void *p);
 extern int test_ini(void *p);
 extern int test_buffer(void *p);
+extern int test_thread(void *p);
 
-int test_main_entry(int argc, char * argv[])
+int main(int argc, char * argv[])
 {
     dbg_out_W(DS_TM, "TLS_SVR - module test");
     if(main_init()) {
@@ -17,15 +18,9 @@ int test_main_entry(int argc, char * argv[])
         { "bio",        NULL,   test_bio, },
         { "ini parse",  NULL,   test_ini, },
         { "buffer",     NULL,   test_buffer, },
+        { "thread",     NULL,   test_thread, },
         )
 
     return 0;
 }
-
-int __mdl_test_entry__(int argc, char * argv[])
-{
-    test_main_entry(argc, argv);
-    exit(0);
-}
-
 

@@ -3,13 +3,13 @@
 #include <config.h>
 
 typedef struct {                        //!< 大块结构体
-    long sem_hdl;                       //!< 信号量集句柄，控制块指针
+    long sem_hdl[BUFFER_BLOCK_NUM];     //!< 信号量句柄数组，控制各块指针访问
     char * b[BUFFER_BLOCK_NUM];         //!< 块指针数组
 }BUF_BIG_BLOCK_T;
 typedef struct {                        //!< 缓存结构体
     unsigned int limit;                 //!< 缓存上限，为BUFFER_BLOCK_SIZE倍数
     unsigned long long count;           //!< 数据量计数
-    long sem_hdl;                       //!< 信号量集句柄，控制计数
+    long sem_hdl;                       //!< 信号量句柄，控制计数
     BUF_BIG_BLOCK_T * bb[BUFFER_BIG_BLOCK_NUM]; //!< 大块指针数组
 }BUF_T;
 
@@ -53,11 +53,6 @@ static int buf_operate(struct BUF_OPE_PARAMS_T * p, int mode)
                 dbg_outerr_E(DS_BUFFER_ERR, "malloc");
                 return CONF_BUFFER_RET_MEM;
             }
-            if(bio_sem()->new(".", BUFFER_BLOCK_NUM, 1, &hdl->bb[i]->sem_hdl)
-                    < 0) {
-                dbg_out_E(DS_BUFFER_ERR, "Create sem failed");
-                return CONF_BUFFER_RET_SEM_ERR;
-            }
             dbg_out_I(DS_BUFFER, "Malloc big block: %#x", hdl->bb[i]);
         }
         if(hdl->bb[i]->b[j] == NULL) {
@@ -65,6 +60,10 @@ static int buf_operate(struct BUF_OPE_PARAMS_T * p, int mode)
             if(hdl->bb[i]->b[j] == NULL) {
                 dbg_outerr_E(DS_BUFFER_ERR, "malloc");
                 return CONF_BUFFER_RET_MEM;
+            }
+            if(bio_sem()->new(1, &hdl->bb[i]->sem_hdl[j]) < 0) {
+                dbg_out_E(DS_BUFFER_ERR, "Create sem failed");
+                return CONF_BUFFER_RET_SEM_ERR;
             }
             dbg_out_I(DS_BUFFER, "Malloc block: %#x", hdl->bb[i]->b[j]);
         }
@@ -85,13 +84,13 @@ static int buf_operate(struct BUF_OPE_PARAMS_T * p, int mode)
                     break;
                 }
                 case BUF_MARK: {
-                    bio_sem()->p(j, -1, hdl->bb[i]->sem_hdl);
+                    bio_sem()->wait(-1, hdl->bb[i]->sem_hdl[j]);
                     dbg_out_I(DS_BUFFER, "[%d][%d][%d]Mark:%d",
                             i, j, blkofs, len_t);
                     break;
                 }
                 case BUF_UNMARK: {
-                    bio_sem()->v(j, hdl->bb[i]->sem_hdl);
+                    bio_sem()->post(hdl->bb[i]->sem_hdl[j]);
                     dbg_out_I(DS_BUFFER, "[%d][%d][%d]Unmark:%d",
                             i, j, blkofs, len_t);
                     break;
@@ -127,13 +126,13 @@ int buf_append(char * buf, unsigned int length, long p)
     int len = length;
     struct BUF_OPE_PARAMS_T o = { buf, length, hdl->count, p, };
     while(1) {
-        bio_sem()->p(0, -1, hdl->sem_hdl);
+        bio_sem()->wait(-1, hdl->sem_hdl);
         if((ret = buf_operate(&o, BUF_MARK)) < 0) { //!< 锁定要操作的块
-            bio_sem()->v(0, hdl->sem_hdl);
+            bio_sem()->post(hdl->sem_hdl);
             break;
         }
         hdl->count += ret;              //!< 更新长度计数，防止其他线程读旧数据
-        bio_sem()->v(0, hdl->sem_hdl);
+        bio_sem()->post(hdl->sem_hdl);
         if((ret = buf_operate(&o, BUF_WRITE)) < 0) {    //!< 写数据
             break;
         }
@@ -161,15 +160,15 @@ int buf_read(char * buf, unsigned int length, long long pos, long p)
     int len = length;
     struct BUF_OPE_PARAMS_T o = { buf, length, pos, p, };
     while(1) {
-        bio_sem()->p(0, -1, hdl->sem_hdl);
+        bio_sem()->wait(-1, hdl->sem_hdl);
         if(o.pos >= hdl->count) {
-            bio_sem()->v(0, hdl->sem_hdl);
+            bio_sem()->post(hdl->sem_hdl);
             dbg_out_E(DS_BUFFER_ERR, "Bad param, pos:%d, length:%d, count:%d",
                     o.pos, hdl->count);
             return CONF_BUFFER_RET_PARAM_ERR;   //!< 读取位置超出范围
         }
         if(o.pos + hdl->limit < hdl->count) {
-            bio_sem()->v(0, hdl->sem_hdl);
+            bio_sem()->post(hdl->sem_hdl);
             return CONF_BUFFER_RET_DATALOST;    //!< 读取位置的数据已被覆盖
         }
         if(o.pos + o.length > hdl->count) {
@@ -179,10 +178,10 @@ int buf_read(char * buf, unsigned int length, long long pos, long p)
                     length, o.length);
         }
         if((ret = buf_operate(&o, BUF_MARK)) < 0) { //!< 锁定要操作的块
-            bio_sem()->v(0, hdl->sem_hdl);
+            bio_sem()->post(hdl->sem_hdl);
             break;
         }
-        bio_sem()->v(0, hdl->sem_hdl);
+        bio_sem()->post(hdl->sem_hdl);
         if((ret = buf_operate(&o, BUF_READ)) < 0) { //!< 读数据
             break;
         }
@@ -205,9 +204,9 @@ unsigned long long buf_size(long p)
         dbg_out_E(DS_BUFFER_ERR, "Bad param, p:%#x", hdl);
         return CONF_BUFFER_RET_PARAM_ERR;
     }
-    bio_sem()->p(0, -1, hdl->sem_hdl);
+    bio_sem()->wait(-1, hdl->sem_hdl);
     unsigned long long cnt = hdl->count;
-    bio_sem()->v(0, hdl->sem_hdl);
+    bio_sem()->post(hdl->sem_hdl);
     return cnt;
 }
 /** \brief       初始化数据缓存 */
@@ -229,7 +228,7 @@ int buf_new(unsigned int limit, long * p)
         dbg_out_W(DS_BUFFER_ERR, "Bad limit:%d, fill to %d", limit, lmt);
     }
     hdl->limit = lmt;
-    if(bio_sem()->new(".", 1, 1, &hdl->sem_hdl) < 0) {
+    if(bio_sem()->new(1, &hdl->sem_hdl) < 0) {
         dbg_out_E(DS_BUFFER_ERR, "Create semaphore failed");
         return CONF_BUFFER_RET_SEM_ERR;
     }
@@ -262,9 +261,9 @@ int buf_del(long *p)
             dbg_out_I(DS_BUFFER, "\t > free block:%#x", hdl->bb[j]->b[k]);
             free(hdl->bb[j]->b[k]);
             hdl->bb[j]->b[k] = NULL;
+            bio_sem()->del(&hdl->bb[j]->sem_hdl[k]);
         }
         dbg_out_I(DS_BUFFER, " > free big block:%#x", hdl->bb[j]);
-        bio_sem()->del(&hdl->bb[j]->sem_hdl);
         free(hdl->bb[j]);
         hdl->bb[j] = NULL;
     }

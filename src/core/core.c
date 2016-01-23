@@ -1,42 +1,23 @@
 #include <stdlib.h> 
 #include <config.h>
 
-int main_init(void)
+int main(int argc, char * argv[])
 {
     int ret;
     do {
-        if((ret = bio_init())) {
-            dbg_out_E(DS_SVR_ERR, "BIO init failed! %d", ret);
+        if((ret = main_init())) {       //!< 程序初始化
             break;
         }
-        if((ret = bio_debug_init())) {
-            dbg_out_E(DS_SVR_ERR, "Debug BIO init failed! %d", ret);
+        if((ret = option_parse(argc, argv))) {  //!< 选项处理
             break;
         }
-        return 0;
-    } while(0);
-    return ret;
-}
-
-static int main_entry(int argc, char * argv[])
-{
-    int ret;
-    dbg_out_entry(DS_SVR);
-    do {
-        if((ret = main_init())) {
+        if((ret = main_process())) {    //!< 主流程
             break;
         }
-        dbg_out_exit(DS_SVR);
         return 0;
     } while(0);
 
     dbg_out_E(DS_SVR_ERR, "Fatal error: %d(%p), stop!", ret, ret);
     return -1;
-}
-
-int __tls_svr_entry__(int argc, char * argv[])
-{
-    main_entry(argc, argv);
-    exit(0);
 }
 

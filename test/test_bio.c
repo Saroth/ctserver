@@ -9,22 +9,13 @@ int test_bio_sem(void *p)
         dbg_out_I(DS_TM, "####");
         dbg_out_I(DS_TM, "1.New");
         dbg_out_I(DS_TM, "2.Delete");
-        dbg_out_I(DS_TM, "3.Force delete");
-        dbg_out_I(DS_TM, "4.P");
-        dbg_out_I(DS_TM, "5.V");
-        dbg_out_I(DS_TM, "6.Val");
-        dbg_out_I(DS_TM, "7.SetVal");
+        dbg_out_I(DS_TM, "3.Wait");
+        dbg_out_I(DS_TM, "4.Post");
+        dbg_out_I(DS_TM, "5.Val");
         switch(dbg_in()) {
             case 1: {
-                char name[256] = { 0 };
-                dbg_out_I(DS_TM, " >> Input name for get key(e.g.: .)");
-                dbg_in_S(name, 256);
-                dbg_out_I(DS_TM, " << Get name: %s", name);
-                dbg_out_I(DS_TM, " >> Input sem number:");
-                int num = dbg_in();
-                dbg_out_I(DS_TM, " << Get sem number: %d", num);
                 dbg_out_I(DS_TM, "Make new semaphore...");
-                ret = bio_sem()->new(name, num, 1, &hdl);
+                ret = bio_sem()->new(1, &hdl);
                 dbg_out_I(DS_TM, "Return: %d, hdl: %x", ret, hdl);
                 break;
             }
@@ -35,50 +26,20 @@ int test_bio_sem(void *p)
                 break;
             }
             case 3: {
-                char name[256] = { 0 };
-                dbg_out_I(DS_TM, " >> Input name for get key(e.g.: .)");
-                dbg_in_S(name, 256);
-                dbg_out_I(DS_TM, " << Get name: %s", name);
-                dbg_out_I(DS_TM, "Force delete semaphore(%x)...", hdl);
-                ret = bio_sem()->fdel(name);
-                dbg_out_I(DS_TM, "Return: %d, hdl: %x", ret, hdl);
+                dbg_out_I(DS_TM, " >> Set time:(-1:Forever, 0:noWait, ~:(ms))");
+                int time = dbg_in();
+                dbg_out_I(DS_TM, " << Get time: %d", time);
+                ret = bio_sem()->wait(time, hdl);
+                dbg_out_I(DS_TM, "Return: %d", ret);
                 break;
             }
             case 4: {
-                dbg_out_I(DS_TM, " >> Input sem number:");
-                int num = dbg_in();
-                dbg_out_I(DS_TM, " << Get sem number: %d", num);
-                dbg_out_I(DS_TM, " >> Set time:(-1:Forever, 0:noWait)");
-                int time = dbg_in();
-                dbg_out_I(DS_TM, " << Get time: %d", time);
-                ret = bio_sem()->p(num, time, hdl);
+                ret = bio_sem()->post(hdl);
                 dbg_out_I(DS_TM, "Return: %d", ret);
                 break;
             }
             case 5: {
-                dbg_out_I(DS_TM, " >> Input sem number:");
-                int num = dbg_in();
-                dbg_out_I(DS_TM, " << Get sem number: %d", num);
-                ret = bio_sem()->v(num, hdl);
-                dbg_out_I(DS_TM, "Return: %d", ret);
-                break;
-            }
-            case 6: {
-                dbg_out_I(DS_TM, " >> Input sem number:");
-                int num = dbg_in();
-                dbg_out_I(DS_TM, " << Get sem number: %d", num);
-                ret = bio_sem()->val(num, hdl);
-                dbg_out_I(DS_TM, "Return: %d", ret);
-                break;
-            }
-            case 7: {
-                dbg_out_I(DS_TM, " >> Input sem number:");
-                int num = dbg_in();
-                dbg_out_I(DS_TM, " << Get sem number: %d", num);
-                dbg_out_I(DS_TM, " >> Input value:");
-                int val = dbg_in();
-                dbg_out_I(DS_TM, " << Get val: %d", val);
-                ret = bio_sem()->setval(num, val, hdl);
+                ret = bio_sem()->val(hdl);
                 dbg_out_I(DS_TM, "Return: %d", ret);
                 break;
             }

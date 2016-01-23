@@ -2,171 +2,96 @@
 
 #if defined(CFG_SYS_UNIX)
 #include <stdlib.h>
-#include <string.h>
 #include <errno.h>
-#include <sys/sem.h>
+#include <semaphore.h>
 
-union semun {
-    int              val;    /* Value for SETVAL */
-    struct semid_ds *buf;    /* Buffer for IPC_STAT, IPC_SET */
-    unsigned short  *array;  /* Array for GETALL, SETALL */
-    struct seminfo  *__buf;  /* Buffer for IPC_INFO
-                               (Linux-specific) */
-};
-typedef struct {                        //!< 信号量集信息结构体
-    int key;                            //!< 用于申请信号量集的key
-    int id;                             //!< 申请获得的信号量集id
-    int num;                            //!< 信号量集的信号量数
-}BIO_SEM_HDL_T;
-static unsigned int s_bio_sem_id = 0x1;     //!< 获取key时使用的ID
-static inline int unix_sem_p(int num, long wait, long hdl)
+static int unix_sem_wait(long wait, long hdl)
 {
-    BIO_SEM_HDL_T * sem = (BIO_SEM_HDL_T *)hdl;
-    struct sembuf sb;
-    sb.sem_num = num;
-    sb.sem_op = -1;
-    if(wait == 0) {
-        sb.sem_flg = IPC_NOWAIT;        //!< 不等待
+    sem_t * sem = (sem_t *)hdl;
+    int ret;
+    if(wait == -1) {
+        ret = sem_wait(sem);
+    }
+    else if(wait == 0) {
+        ret = sem_trywait(sem);
+    }
+    else if(wait > 0) {
+        struct timespec t;
+        t.tv_sec = ((unsigned long)wait / 1000);
+        t.tv_nsec = ((unsigned long)wait % 1000) * 1000000;
+        ret = sem_timedwait(sem, &t);
     }
     else {
-        sb.sem_flg = SEM_UNDO;          //!< 永久等待
+        return -1;
     }
-    // struct timespec t;
-    // struct timespec *tp = NULL;
-    // if(wait > 0) {
-    //     t.tv_sec = wait;
-    //     tp = &t;
-    // }
-    // if(semtimedop(sem->id, &sb, 1, tp) < 0) {
-    //     dbg_outerr_E(DS_SEM_ERR, "semtimedop, wait:%d", wait);
-    //     return -1;
-    // }
-    if(semop(sem->id, &sb, 1) < 0) {
-        dbg_outerr_E(DS_SEM_ERR, "semop, wait:%d", wait);
+    if(ret < 0 && errno != EAGAIN && errno != ETIMEDOUT) {
+        dbg_outerr_E(DS_SEM_ERR, "sem_.*wait, wait:%d", wait);
+        return -1;
+    }
+    else if(ret < 0) {
+        dbg_outerr_I(DS_SEM, "sem_.*wait, wait:%d", wait);
+    }
+    return ret;
+}
+static int unix_sem_post(long hdl)
+{
+    sem_t * sem = (sem_t *)hdl;
+    if(sem_post(sem) < 0) {
+        dbg_outerr_E(DS_SEM_ERR, "sem_post");
         return -1;
     }
     return 0;
 }
-static inline int unix_sem_v(int num, long hdl)
+static int unix_sem_val(long hdl)
 {
-    BIO_SEM_HDL_T * sem = (BIO_SEM_HDL_T *)hdl;
-    struct sembuf sb;
-    sb.sem_num = num;
-    sb.sem_op = 1;
-    sb.sem_flg = SEM_UNDO;
-    if(semop(sem->id, &sb, 1) < 0) {
-        dbg_outerr_E(DS_SEM_ERR, "semop, V, num:%d", sb.sem_num);
+    sem_t * sem = (sem_t *)hdl;
+    int val;
+    if(sem_getvalue(sem, &val) < 0) {
+        dbg_outerr_E(DS_SEM_ERR, "sem_getvalue");
         return -1;
     }
-    return 0;
-}
-static int unix_sem_val(int num, long hdl)
-{
-    BIO_SEM_HDL_T * sem = (BIO_SEM_HDL_T *)hdl;
-    int ret = semctl(sem->id, num, GETVAL);
-    if(ret < 0) {
-        dbg_outerr_E(DS_SEM_ERR, "semctl, GETVAL, id:%d num:%d", sem->id, num);
+    if(val < 0) {
+        dbg_outerr_I(DS_SEM, "sem_getvalue, val:%d", val);
+        val = 0;    //!< 不返回负值(负值绝对值表示当前正在等待的线程数)
     }
-    return ret;
+    return val;
 }
-static int unix_sem_setval(int num, int val, long hdl)
+static int unix_sem_new(int val, long * hdl)
 {
-    BIO_SEM_HDL_T * sem = (BIO_SEM_HDL_T *)hdl;
-    union semun arg;
-    arg.val = val;
-    int ret = semctl(sem->id, num, SETVAL, arg);
-    if(ret < 0) {
-        dbg_outerr_E(DS_SEM_ERR, "semctl, SETVAL, id:%d num:%d, val:%d",
-                sem->id, num, val);
-    }
-    return ret;
-}
-static int sem_new(char * name, int num, int val, int id, int mode, long * hdl)
-{
-    BIO_SEM_HDL_T * sem = (BIO_SEM_HDL_T *)malloc(sizeof(BIO_SEM_HDL_T));
+    sem_t * sem = (sem_t *)malloc(sizeof(sem_t));
     if(sem == NULL) {
         dbg_outerr_E(DS_SEM_ERR, "malloc");
         return -1;
     }
-    memset(sem, 0x00, sizeof(BIO_SEM_HDL_T));
-    do {
-        sem->key = ftok(name, id);       //!< 获取key
-        if(sem->key < 0) {
-            dbg_outerr_E(DS_SEM_ERR, "ftok");
-            return -1;
-        }
-        sem->id = semget(sem->key, num, mode);
-        if(sem->id > 0) {
-            s_bio_sem_id = id + 1;      //!< 递增ID,用于下次申请
-            break;                      //!< 获得信号量集id
-        }
-        dbg_outerr_W(DS_SEM_ERR, "semget, key:%x, ID:%d", sem->key, id);
-#ifdef BIO_SEM_RETRY_WITH_NEW_ID
-        if(errno == EEXIST && id++ < 0xFF) {
-            dbg_out_W(DS_SEM_ERR, "Retry ID: %d", id);
-            continue;                   //!< 使用新ID重试
-        }
-#endif /* BIO_SEM_RETRY_WITH_NEW_ID */
-        dbg_out_E(DS_SEM_ERR, "Get semaphore failed!");
+    if(sem_init(sem, 0, val) < 0) {
+        free(sem);
+        dbg_outerr_E(DS_SEM_ERR, "sem_init");
         return -1;
-    } while(1);
-    int i = 0;
-    for(; i < num; i++) {               //!< 设置初始值
-        if(unix_sem_setval(i, val, (long)sem)) {
-            return -1;
-        }
     }
-    sem->num = num;
     *hdl = (long)sem;
-    dbg_out_I(DS_SEM, "Get new semaphore, id:%d, key:%x, name:%s",
-            sem->id, sem->key, name);
     return 0;
-}
-static int unix_sem_new(char * name, int num, int val, long * hdl)
-{
-    return sem_new(name, num, val, s_bio_sem_id,
-            0666 | IPC_CREAT | IPC_EXCL, hdl);
 }
 static int unix_sem_del(long * hdl)
 {
-    BIO_SEM_HDL_T * sem = (BIO_SEM_HDL_T *)(*hdl);
+    sem_t * sem = (sem_t *)(*hdl);
     if(sem == NULL) {
-        dbg_out_E(DS_SEM_ERR, "semctl, IPC_RMID: Bad handle.");
+        dbg_out_E(DS_SEM_ERR, "sem_destroy: Bad handle.");
         return -1;
     }
-    dbg_out_I(DS_SEM, "Delete semaphore, id:%d, key:%x", sem->id, sem->key);
-    if(semctl(sem->id, 0, IPC_RMID) < 0) {
-        dbg_outerr_E(DS_SEM_ERR, "semctl, IPC_RMID");
-        return -1;
+    if(sem_destroy(sem) < 0) {
+        dbg_outerr_E(DS_SEM_ERR, "sem_destroy");
     }
     free(sem);
     *hdl = (long)NULL;
     return 0;
 }
-static int unix_sem_fdel(char * name)
-{
-    long hdl;
-    int i = 0x1;
-    dbg_out_I(DS_SEM, "Force delete semaphore, create by: %s", name);
-#ifdef BIO_SEM_RETRY_WITH_NEW_ID
-    for(; i < 0xFF; i++)
-#endif /* BIO_SEM_RETRY_WITH_NEW_ID */
-    {
-        if(sem_new(name, 1, 1, i, IPC_EXCL, &hdl) == 0) {
-            unix_sem_del(&hdl);
-        }
-    }
-    return 0;
-}
 static BIO_SEM_T s_bio_sem_unix = {
-    .desc       = "Unix standard I/O",
+    .desc       = "POSIX semaphore",
     .new        = unix_sem_new,
     .del        = unix_sem_del,
-    .p          = unix_sem_p,
-    .v          = unix_sem_v,
+    .wait       = unix_sem_wait,
+    .post       = unix_sem_post,
     .val        = unix_sem_val,
-    .setval     = unix_sem_setval,
-    .fdel       = unix_sem_fdel,
 };
 #endif /* defined(CFG_SYS_UNIX) */
 
