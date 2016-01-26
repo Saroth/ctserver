@@ -17,7 +17,6 @@
  * \block:      DEBUG
  * @{ */
 #define DS_DEBUG_MAIN 1                 //!< 调试总开关
-#include <libdebug.h>
 
 /// 主要信息输入输出
 #define MIO             DBG_INFO
@@ -35,7 +34,7 @@
 #define DS_CONF_INI_MEM 0   // (DBG_INFO | DBG_LABEL_FUNC | DBG_LABEL_LINE)
 #define DS_CONF_INI_ERR (DBG_INFO | DBG_LABEL_FUNC | DBG_LABEL_LINE)
 /// 缓存模块调试
-#define DS_BUFFER       (DBG_INFO | DBG_LABEL_FUNC | DBG_LABEL_LINE)
+#define DS_BUFFER       0   // (DBG_INFO | DBG_LABEL_FUNC | DBG_LABEL_LINE)
 #define DS_BUFFER_ERR   (DBG_INFO | DBG_LABEL_FUNC | DBG_LABEL_LINE)
 /// 池模块调试
 #define DS_POOL         (DBG_INFO | DBG_LABEL_FUNC | DBG_LABEL_LINE)
@@ -46,16 +45,19 @@
 /**
  * \block:      Error code segments
  * @{ */
-#define ERR_CODE_BIO        -9900
-#define ERR_CODE_CONF_INI   -9800
-#define ERR_CODE_BUFFER     -9700
-#define ERR_CODE_MAIN       -5400
+#define ERR_CODE_BIO            -9900
+#define ERR_CODE_CONF_INI       -9800
+#define ERR_CODE_BUFFER         -9700
+#define ERR_CODE_POOL_THREAD    -9600
+#define ERR_CODE_MAIN           -5400
 /** @} */
 /**
  * \block:      include
  * @{ */
 #include <stdio.h>
 /// Base modules
+#include <libdebug.h>
+#include "../memwatch/memwatch.h"
 #include "list/list.h"
 #include "../src/bio/bio.h"
 #include "../src/pool/pool.h"

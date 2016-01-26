@@ -2,6 +2,7 @@
 
 #if defined(CFG_SYS_UNIX)
 #include <stdlib.h>
+#include <time.h>
 #include <errno.h>
 #include <semaphore.h>
 
@@ -17,7 +18,7 @@ static int unix_sem_wait(long wait, long hdl)
     }
     else if(wait > 0) {
         struct timespec t;
-        t.tv_sec = ((unsigned long)wait / 1000);
+        t.tv_sec = time(NULL) + ((unsigned long)wait / 1000);
         t.tv_nsec = ((unsigned long)wait % 1000) * 1000000;
         ret = sem_timedwait(sem, &t);
     }

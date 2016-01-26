@@ -8,6 +8,7 @@ extern int test_thread(void *p);
 
 int main(int argc, char * argv[])
 {
+    mwInit();
     dbg_out_W(DS_TM, "TLS_SVR - module test");
     if(main_init()) {
         dbg_out_E(DS_TM, "Main init failed!!!");
@@ -19,8 +20,9 @@ int main(int argc, char * argv[])
         { "ini parse",  NULL,   test_ini, },
         { "buffer",     NULL,   test_buffer, },
         { "thread",     NULL,   test_thread, },
-        )
+        );
 
+    mwTerm();
     return 0;
 }
 

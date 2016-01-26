@@ -10,9 +10,9 @@
  *              空间总量达到上限时不再申请新块，新存入的数据将覆盖最旧的数据。
  */
 
-#define BUFFER_BLOCK_SIZE   0x10 // 0x10000     //!< 每次申请内存块大小
-#define BUFFER_BLOCK_NUM    4 // 64          //!< 块数量
-#define BUFFER_BIG_BLOCK_NUM    2 // 64      //!< 大块数量
+#define BUFFER_BLOCK_SIZE   0x10000     //!< 每次申请内存块大小
+#define BUFFER_BLOCK_NUM    64          //!< 块数量
+#define BUFFER_BIG_BLOCK_NUM    64      //!< 大块数量
 #define BUFFER_MAXSIZE \
     (BUFFER_BLOCK_SIZE * BUFFER_BLOCK_NUM * BUFFER_BIG_BLOCK_NUM) //!< 内存上限
 typedef enum {                          //!< 返回值定义
