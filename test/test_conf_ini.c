@@ -1,6 +1,3 @@
-#include <stdio.h>
-#include <string.h>
-
 #include <config.h>
 
 int test_str_trim(void *p)

@@ -64,6 +64,7 @@ static int unix_sem_new(int val, long * hdl)
         dbg_outerr_E(DS_SEM_ERR, "malloc");
         return -1;
     }
+    memset(sem, 0x00, sizeof(sem_t));
     if(sem_init(sem, 0, val) < 0) {
         free(sem);
         dbg_outerr_E(DS_SEM_ERR, "sem_init");

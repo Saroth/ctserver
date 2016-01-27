@@ -55,12 +55,13 @@
  * \block:      include
  * @{ */
 #include <stdio.h>
+#include <string.h>
 /// Base modules
 #include <libdebug.h>
-#include "../memwatch/memwatch.h"
 #include "list/list.h"
 #include "../src/bio/bio.h"
 #include "../src/pool/pool.h"
+#include "../memwatch/memwatch.h"
 /// Utility modules
 #include "../src/utility/conf/conf_ini.h"
 #include "../src/utility/crc/crc32.h"

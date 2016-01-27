@@ -1,6 +1,5 @@
 #include <unistd.h>
 #include <stdlib.h>
-#include <string.h>
 #include <pthread.h>
 #include <config.h>
 
@@ -37,6 +36,30 @@ typedef struct {                        //!< 线程传入参数结构体
 }THREAD_ARG_T;
 
 /**
+ * \brief       退出线程时清理线程池资源
+ * \param       arg         线程池结构体指针
+ */
+static void pool_cleanup(void * arg)
+{
+    POOL_THREAD_T * p = (POOL_THREAD_T *)arg;
+    //!< 在pthread_cond_wait等待中撤销线程会导致死锁，此处必须要重新解锁
+    if(pthread_mutex_unlock(&p->mutex)) {
+        dbg_outerr_W(DS_POOL_ERR, "pthread_mutex_unlock");
+    }
+}
+/**
+ * \brief       退出线程时清理线程资源
+ * \param       arg         线程结构体指针
+ */
+static void thread_cleanup(void * arg)
+{
+    THREAD_T * t = (THREAD_T *)arg;
+    //!< 在任务中撤销线程时，锁未释放，销毁锁时会警告
+    if(pthread_mutex_unlock(&t->mutex)) {
+        dbg_outerr_W(DS_POOL_ERR, "pthread_mutex_unlock");
+    }
+}
+/**
  * \brief       线程任务处理流程
  * \param       arg         线程传入参数结构体指针, THREAD_ARG_T
  * \return      ~:Success
@@ -57,12 +80,17 @@ static void * routine(void * arg)
             break;
         }
         p->idle_thread_num++;
-        while(list_empty(&p->list_task) && !(p->flag_halt) ) {
+        while(list_empty(&p->list_task) && !(p->flag_halt)) {
+            pthread_cleanup_push(pool_cleanup, p);
             if(pthread_cond_wait(&p->cond, &p->mutex)) {    //!< 解锁并等待条件变量信号
                 dbg_outerr_W(DS_POOL_ERR, "pthread_cond_wait");
             }
+            pthread_cleanup_pop(0);
         }
         if(p->flag_halt) {
+            if(pthread_mutex_unlock(&p->mutex)) {   //!< 退出前先解锁
+                dbg_outerr_W(DS_POOL_ERR, "pthread_mutex_unlock");
+            }
             break;                      //!< 线程池准备销毁
         }
         if(p->list_task_num > 0) {
@@ -82,10 +110,14 @@ static void * routine(void * arg)
         /// 执行任务
         t->state = BUSY;                //!< 线程设为忙状态
         if(t->task->func) {
+            pthread_cleanup_push(thread_cleanup, t);
             t->task->func(t->task->arg);
+            pthread_cleanup_pop(0);
         }
-        free(t->task);
-        t->task = NULL;
+        if(t->task) {
+            free(t->task);
+            t->task = NULL;
+        }
         t->state = IDLE;                //!< 线程设为空闲状态
         if(pthread_mutex_unlock(&t->mutex)) {   //!< 线程结构体访问解锁
             dbg_outerr_W(DS_POOL_ERR, "pthread_mutex_unlock");
@@ -96,9 +128,6 @@ static void * routine(void * arg)
         p->idle_thread_num--;
     }
     list_del(&t->ptr);          //!< 从线程池列表中删除线程结构体
-    if(pthread_mutex_unlock(&p->mutex)) {   //!< 退出前先解锁
-        dbg_outerr_W(DS_POOL_ERR, "pthread_mutex_unlock");
-    }
     if(pthread_mutex_destroy(&t->mutex)) {  //!< 销毁互斥锁
         dbg_outerr_W(DS_POOL_ERR, "pthread_mutex_destroy");
     }
@@ -131,10 +160,8 @@ static int thread_add(POOL_THREAD_T * p)
     arg->p = p;
     if(pthread_mutex_init(&t->mutex, NULL)) {   //!< 初始化互斥锁
         dbg_outerr_E(DS_POOL_ERR, "pthread_mutex_init");
-        if(t) {
-            free(t);
-            t = NULL;
-        }
+        free(t);
+        t = NULL;
         return POOL_THREAD_RET_MUTEX_INIT;
     }
     if(pthread_create(&t->tid, NULL, routine, arg)) {  //!< 创建新线程
@@ -183,7 +210,7 @@ static int thread_del(POOL_THREAD_T * p, int force)
             return POOL_THREAD_RET_NO_THREAD_CANCELED;
         }
     }
-    if(pthread_cancel(t->tid)) {    //!< 撤销线程
+    if(pthread_cancel(t->tid)) {        //!< 撤销线程
         dbg_outerr_W(DS_POOL_ERR, "pthread_cancel");
     }
     void * ret;
@@ -194,14 +221,14 @@ static int thread_del(POOL_THREAD_T * p, int force)
         dbg_out_W(DS_POOL_ERR,
                 "Thread wasn't canceled (shouldn't happend!)");
     }
-    list_del(&t->ptr);          //!< 从线程池列表中删除线程结构体
+    list_del(&t->ptr);                  //!< 从线程池列表中删除线程结构体
     p->thread_num--;
     if(t->state == IDLE) {
         p->idle_thread_num--;
     }
-    //!< 退出pthread_cond_wait会自动上锁(即导致死锁)，因此此处需要重新解锁
-    if(pthread_mutex_unlock(&p->mutex)) {
-        dbg_outerr_W(DS_POOL_ERR, "pthread_mutex_unlock");
+    if(t->task) {
+        free(t->task);                  //!< 释放正在运行的任务结构体
+        t->task = NULL;
     }
     if(pthread_mutex_destroy(&t->mutex)) {  //!< 销毁互斥锁
         dbg_outerr_W(DS_POOL_ERR, "pthread_mutex_destroy");
@@ -296,6 +323,7 @@ int pool_thread_task_add(long hdl, char * name, void * arg, TASK_FUNC_T func)
         dbg_outerr_E(DS_POOL_ERR, "malloc");
         return POOL_THREAD_RET_MEM;
     }
+    memset(t, 0x00, sizeof(TASK_T));
     t->name = name;
     t->arg = arg;
     t->func = func;
@@ -330,8 +358,11 @@ int pool_thread_del(long * hdl)
     p->flag_halt = 1;                   //!< 设置终止标记
     while(!list_empty(&p->list_task)) { //!< 清空任务列表
         TASK_T * t = list_first_entry(&p->list_task, TASK_T, ptr);
-        free(t);
-        list_del(&t->ptr);
+        if(t) {
+            list_del(&t->ptr);
+            free(t);
+            t = NULL;
+        }
     }
     p->list_task_num = 0;
     if(pthread_cond_broadcast(&p->cond)) {  //!< 广播通告所有线程自动退出
@@ -373,6 +404,7 @@ int pool_thread_new(long * hdl)
             ret = POOL_THREAD_RET_MEM;
             break;
         }
+        memset(p, 0x00, sizeof(POOL_THREAD_T));
         if(pthread_mutex_init(&p->mutex, NULL)) {
             dbg_outerr_E(DS_POOL_ERR, "pthread_mutex_init");
             ret = POOL_THREAD_RET_MUTEX_INIT;
@@ -390,14 +422,14 @@ int pool_thread_new(long * hdl)
         p->idle_thread_num = 0;
         p->flag_halt = 0;
 
-        if(thread_add(p)) {
-            dbg_out_E(DS_POOL_ERR, "Create thread failed!");
-            ret = POOL_THREAD_RET_THREAD_CREATE;
-            break;
-        }
         if((ret = pool_thread_task_add((long)p, "Thread pool manager",
                         p, manager))) {
             dbg_out_E(DS_POOL_ERR, "Create thread pool manager failed!");
+            break;
+        }
+        if(thread_add(p)) {
+            dbg_out_E(DS_POOL_ERR, "Create thread failed!");
+            ret = POOL_THREAD_RET_THREAD_CREATE;
             break;
         }
         *hdl = (long)p;

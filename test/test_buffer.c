@@ -1,4 +1,3 @@
-#include <string.h>
 #include <config.h>
 
 static long s_hdl = 0;

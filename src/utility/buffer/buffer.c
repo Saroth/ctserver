@@ -1,4 +1,3 @@
-#include <string.h>
 #include <stdlib.h>
 #include <config.h>
 
@@ -53,6 +52,7 @@ static int buf_operate(struct BUF_OPE_PARAMS_T * p, int mode)
                 dbg_outerr_E(DS_BUFFER_ERR, "malloc");
                 return CONF_BUFFER_RET_MEM;
             }
+            memset(hdl->bb[i], 0x00, sizeof(BUF_BIG_BLOCK_T));
             dbg_out_I(DS_BUFFER, "Malloc big block: %#x", hdl->bb[i]);
         }
         if(hdl->bb[i]->b[j] == NULL) {
@@ -61,6 +61,7 @@ static int buf_operate(struct BUF_OPE_PARAMS_T * p, int mode)
                 dbg_outerr_E(DS_BUFFER_ERR, "malloc");
                 return CONF_BUFFER_RET_MEM;
             }
+            memset(hdl->bb[i]->b[j], 0x00, sizeof(BUFFER_BLOCK_SIZE));
             if(bio_sem()->new(1, &hdl->bb[i]->sem_hdl[j]) < 0) {
                 dbg_out_E(DS_BUFFER_ERR, "Create sem failed");
                 return CONF_BUFFER_RET_SEM_ERR;
