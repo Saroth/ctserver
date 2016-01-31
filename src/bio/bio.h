@@ -145,9 +145,8 @@ BIO_FCTL_T * bio_fctl(void);
 /**
  * \block:      Semaphore
  * @{ */
-#define BIO_SEM_RETRY_WITH_NEW_ID   //!< 信号量已存在时，使用新ID重新申请
 /**
- * \brief       创建信号量集
+ * \brief       创建信号量
  * \param       name        用于获取key的文件名或信号量名
  * \param       val         初始值
  * \param [out] hdl         句柄指针
@@ -155,7 +154,7 @@ BIO_FCTL_T * bio_fctl(void);
  */
 typedef int (* BIO_FUNC_SEM_NEW)(int val, long * hdl);
 /**
- * \brief       删除信号量集
+ * \brief       删除信号量
  * \param [i/o] hdl         句柄指针
  * \return      0:Success   <0:Error
  */
@@ -181,8 +180,8 @@ typedef int (* BIO_FUNC_SEM_POST)(long hdl);
 typedef int (* BIO_FUNC_SEM_VAL)(long hdl);
 typedef struct {                        //!< 信号量操作接口配置结构体
     char * desc;                        //!< 接口类型描述
-    BIO_FUNC_SEM_NEW new;               //!< 创建信号量集接口函数
-    BIO_FUNC_SEM_DEL del;               //!< 删除信号量集接口函数
+    BIO_FUNC_SEM_NEW new;               //!< 创建信号量接口函数
+    BIO_FUNC_SEM_DEL del;               //!< 删除信号量接口函数
     BIO_FUNC_SEM_WAIT wait;             //!< 挂起信号量接口函数
     BIO_FUNC_SEM_POST post;             //!< 释放信号量接口函数
     BIO_FUNC_SEM_VAL val;               //!< 获取信号量值接口函数
@@ -194,11 +193,54 @@ typedef struct {                        //!< 信号量操作接口配置结构�
  */
 int bio_sem_init(void * io);
 /**
- * \brief       获取信号量集操作接口结构体
+ * \brief       获取信号量操作接口结构体
  * \return      接口结构体指针
  */
 BIO_SEM_T * bio_sem(void);
 /** @} */
+/**
+ * \block:      Shared Memory Segments
+ * @{ */
+typedef enum {                          //!< 映射类型
+    SHM_TYPE_SHM,                       //!< 共享内存映射
+    SHM_TYPE_FILE,                      //!< 文件映射
+    SHM_TYPE_ANONYMOUS,                 //!< 匿名内存映射
+}BIO_SHM_TYPE_E;
+/**
+ * \brief       申请共享内存
+ * \param       type        映射类型，BIO_SHM_TYPE_E
+ * \param       name        文件名，type=SHM_TYPE_ANONYMOUS时不需要
+ * \param       size        共享内存大小
+ * \param [out] addr        共享内存地址
+ * \param [out] hdl         共享内存句柄指针
+ * \return      0:Success   <0:Error
+ */
+typedef int (* BIO_FUNC_SHM_NEW)(int type, char * name, unsigned int size,
+        long * addr, long * hdl);
+/**
+ * \brief       释放共享内存
+ * \param [i/o] hdl         共享内存句柄指针
+ * \return      0:Success   <0:Error
+ */
+typedef int (* BIO_FUNC_SHM_DEL)(long * hdl);
+typedef struct {
+    char * desc;                        //!< 接口类型描述
+    BIO_FUNC_SHM_NEW new;               //!< 申请共享内存函数指针
+    BIO_FUNC_SHM_DEL del;               //!< 释放共享内存函数指针
+}BIO_SHM_T;
+/**
+ * \brief       初始化接口
+ * \param       io          自定义接口结构体指针
+ * \return      0:Success   <0:Error
+ */
+int bio_shm_init(void * io);
+/**
+ * \brief       获取共享内存操作接口结构体
+ * \return      接口结构体指针
+ */
+BIO_SHM_T * bio_shm(void);
+/** @} */
+
 
 #ifdef __cplusplus
 }

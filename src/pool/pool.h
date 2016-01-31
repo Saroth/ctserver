@@ -10,7 +10,7 @@
 #define THREAD_INTERVAL_CREATE  2       //!< 线程创建间隔(s)
 #define THREAD_INTERVAL_DESTROY 16      //!< 线程销毁间隔(s)
 #define THREAD_INTERVAL_COND_SIGNAL 4   //!< 任务信号发送间隔(s)
-#define THREAD_QUIT_WAITTIME_MAX    4   //!< 线程池销毁时等待各线程自动退出的时间
+#define THREAD_QUIT_WAITTIME_MAX    8   //!< 线程池销毁时等待各线程自动退出的时间
 
 typedef enum {                          //!< 返回值定义
     POOL_THREAD_RET = ERR_CODE_POOL_THREAD, //!< 起始码

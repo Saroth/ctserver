@@ -11,7 +11,7 @@ typedef struct {                        //!< 任务结构体
 }TASK_T;
 typedef enum {                          //!< 线程状态
     IDLE,                               //!< idle
-    BUSY,                               //!< BUSY
+    BUSY,                               //!< busy
 }THREAD_STATE_E;
 typedef struct {                        //!< 线程结构体
     TASK_T * task;                      //!< 任务
@@ -26,9 +26,9 @@ typedef struct {                        //!< 线程池结构体
     struct list_head list_task;         //!< 任务列表
     int list_task_num;                  //!< 任务列表任务数
     struct list_head list_thread;       //!< 线程结构体指针数组
-    int thread_num;            //!< 当前线程数
-    int idle_thread_num;       //!< 当前空闲线程数
-    int flag_halt;             //!< 销毁标记, 0:Disable; 1:Enable
+    int thread_num;                     //!< 当前线程数
+    int idle_thread_num;                //!< 当前空闲线程数
+    int flag_halt;                      //!< 销毁标记, 0:Disable; 1:Enable
 }POOL_THREAD_T;
 typedef struct {                        //!< 线程传入参数结构体
     POOL_THREAD_T * p;                  //!< 线程池结构体指针

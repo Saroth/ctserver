@@ -26,11 +26,11 @@ static int unix_sem_wait(long wait, long hdl)
         return -1;
     }
     if(ret < 0 && errno != EAGAIN && errno != ETIMEDOUT) {
-        dbg_outerr_E(DS_SEM_ERR, "sem_.*wait, wait:%d", wait);
+        dbg_outerr_E(DS_SEM_ERR, "sem_wait, wait:%d", wait);
         return -1;
     }
     else if(ret < 0) {
-        dbg_outerr_I(DS_SEM, "sem_.*wait, wait:%d", wait);
+        dbg_outerr_I(DS_SEM, "sem_wait, wait:%d", wait);
     }
     return ret;
 }
@@ -77,7 +77,7 @@ static int unix_sem_del(long * hdl)
 {
     sem_t * sem = (sem_t *)(*hdl);
     if(sem == NULL) {
-        dbg_out_E(DS_SEM_ERR, "sem_destroy: Bad handle.");
+        dbg_out_E(DS_SEM_ERR, "Bad handle.");
         return -1;
     }
     if(sem_destroy(sem) < 0) {

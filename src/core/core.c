@@ -17,7 +17,7 @@ int main(int argc, char * argv[])
         return 0;
     } while(0);
 
-    dbg_out_E(DS_SVR_ERR, "Fatal error: %d(%p), stop!", ret, ret);
+    dbg_out_E(DS_MAIN_ERR, "Fatal error: %d(%p), stop!", ret, ret);
     return -1;
 }
 

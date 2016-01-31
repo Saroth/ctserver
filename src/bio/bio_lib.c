@@ -7,6 +7,8 @@ static BIO_INITLIST_T s_bio_initlist[] = {
         (unsigned long)&((BIO_IO_T *)0)->desc,  },
     { "Semaphore",      NULL,   bio_sem_init,   (BIO_CHECK)bio_sem,
         (unsigned long)&((BIO_SEM_T *)0)->desc,  },
+    { "Shared Memory",  NULL,   bio_shm_init,   (BIO_CHECK)bio_shm,
+        (unsigned long)&((BIO_SHM_T *)0)->desc,  },
 };
 
 int bio_init(void)
