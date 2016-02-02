@@ -211,22 +211,35 @@ typedef enum {                          //!< 映射类型
  * \param       type        映射类型，BIO_SHM_TYPE_E
  * \param       name        文件名，type=SHM_TYPE_ANONYMOUS时不需要
  * \param       size        共享内存大小
- * \param [out] addr        共享内存地址
  * \param [out] hdl         共享内存句柄指针
  * \return      0:Success   <0:Error
  */
 typedef int (* BIO_FUNC_SHM_NEW)(int type, char * name, unsigned int size,
-        long * addr, long * hdl);
+        long * hdl);
 /**
- * \brief       释放共享内存
+ * \brief       释放共享内存，如果是文件映射，则同时删除文件
  * \param [i/o] hdl         共享内存句柄指针
  * \return      0:Success   <0:Error
  */
 typedef int (* BIO_FUNC_SHM_DEL)(long * hdl);
+/**
+ * \brief       获取共享内存大小
+ * \param       hdl         共享内存句柄
+ * \return      >0:Success   <0:Error
+ */
+typedef int (* BIO_FUNC_SHM_SIZE)(long hdl);
+/**
+ * \brief       获取共享内存地址
+ * \param       hdl         共享内存句柄
+ * \return      >0:Success  <=0:Error
+ */
+typedef void * (* BIO_FUNC_SHM_ADDR)(long hdl);
 typedef struct {
     char * desc;                        //!< 接口类型描述
     BIO_FUNC_SHM_NEW new;               //!< 申请共享内存函数指针
     BIO_FUNC_SHM_DEL del;               //!< 释放共享内存函数指针
+    BIO_FUNC_SHM_SIZE size;             //!< 获取共享内存大小函数指针
+    BIO_FUNC_SHM_ADDR addr;             //!< 获取共享内存地址函数指针
 }BIO_SHM_T;
 /**
  * \brief       初始化接口

@@ -65,7 +65,8 @@ int test_add_task(void *p)
     int i;
     int ret;
     for(i = 0; i < num; i++) {
-        ret = pool_thread_task_add(g_threadpool_hdl, "test", &i, test_task);
+        ret = pool_thread_task_add(g_threadpool_hdl, "test", &i,
+                sizeof(int), test_task);
         dbg_out_I(DS_TM, "Add task: %d(%d)", i, ret);
     }
     return 0;
@@ -77,16 +78,6 @@ int test_destroy_threadpool(void *p)
     dbg_out_I(DS_TM, "return: %d", ret);
     return 0;
 }
-typedef struct {                        //!< 线程池结构体
-    pthread_mutex_t mutex;              //!< 互斥锁
-    pthread_cond_t cond;                //!< 条件锁
-    struct list_head list_task;         //!< 任务列表
-    int list_task_num;                  //!< 任务列表任务数
-    struct list_head list_thread;       //!< 线程结构体指针数组
-    unsigned int thread_num;            //!< 当前线程数
-    unsigned int idle_thread_num;       //!< 当前空闲线程数
-    unsigned int flag_halt;             //!< 销毁标记, 0:Disable; 1:Enable
-}POOL_THREAD_T;
 int test_task_count(void *p)
 {
     struct list_head * ptr;
@@ -102,19 +93,6 @@ int test_task_count(void *p)
     dbg_out_I(DS_TM, "Task num in list: %d", i);
     return 0;
 }
-typedef struct {                        //!< 任务结构体
-    char * name;                        //!< 任务名
-    void * arg;                         //!< 任务接口参数
-    TASK_FUNC_T func;                   //!< 任务接口函数指针
-    struct list_head ptr;               //!< 列表节点
-}TASK_T;
-typedef struct {                        //!< 线程结构体
-    TASK_T * task;                      //!< 任务
-    int state;                          //!< 线程状态, THREAD_STATE_E
-    pthread_t tid;                      //!< 线程ID;
-    pthread_mutex_t mutex;              //!< 互斥锁
-    struct list_head ptr;               //!< 列表节点
-}THREAD_T;
 int test_thread_monitor(void *p)
 {
     struct list_head * ptr;
@@ -131,7 +109,8 @@ int test_thread_monitor(void *p)
         dbg_out_I(DS_TM, " > %d. [%#x] state:%d, task:%#x",
                 i, t->tid, t->state, t->task);
         if(t->task) {
-            dbg_out_I(DS_TM, " \t task name: %#s", t->task->name);
+            dbg_out_I(DS_TM, " \t task name: %#x", t->task->name);
+            dbg_out_I(DS_TM, " \t task name: %s", t->task->name);
         }
     }
     return 0;

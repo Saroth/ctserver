@@ -1,40 +1,11 @@
 #include <unistd.h>
 #include <stdlib.h>
-#include <pthread.h>
 #include <config.h>
 
-typedef struct {                        //!< 任务结构体
-    char * name;                        //!< 任务名
-    void * arg;                         //!< 任务接口参数
-    TASK_FUNC_T func;                   //!< 任务接口函数指针
-    struct list_head ptr;               //!< 列表节点
-}TASK_T;
-typedef enum {                          //!< 线程状态
-    IDLE,                               //!< idle
-    BUSY,                               //!< busy
-}THREAD_STATE_E;
-typedef struct {                        //!< 线程结构体
-    TASK_T * task;                      //!< 任务
-    int state;                          //!< 线程状态, THREAD_STATE_E
-    pthread_t tid;                      //!< 线程ID;
-    pthread_mutex_t mutex;              //!< 互斥锁
-    struct list_head ptr;               //!< 列表节点
-}THREAD_T;
-typedef struct {                        //!< 线程池结构体
-    pthread_mutex_t mutex;              //!< 互斥锁
-    pthread_cond_t cond;                //!< 条件锁
-    struct list_head list_task;         //!< 任务列表
-    int list_task_num;                  //!< 任务列表任务数
-    struct list_head list_thread;       //!< 线程结构体指针数组
-    int thread_num;                     //!< 当前线程数
-    int idle_thread_num;                //!< 当前空闲线程数
-    int flag_halt;                      //!< 销毁标记, 0:Disable; 1:Enable
-}POOL_THREAD_T;
 typedef struct {                        //!< 线程传入参数结构体
     POOL_THREAD_T * p;                  //!< 线程池结构体指针
     THREAD_T * t;                       //!< 线程结构体指针数组下标
 }THREAD_ARG_T;
-
 /**
  * \brief       退出线程时清理线程池资源
  * \param       arg         线程池结构体指针
@@ -108,7 +79,7 @@ static void * routine(void * arg)
             dbg_outerr_W(DS_POOL_ERR, "pthread_mutex_unlock");
         }
         /// 执行任务
-        t->state = BUSY;                //!< 线程设为忙状态
+        t->state = THREAD_STATE_BUSY;   //!< 线程设为忙状态
         if(t->task->func) {
             pthread_cleanup_push(thread_cleanup, t);
             t->task->func(t->task->arg);
@@ -118,16 +89,16 @@ static void * routine(void * arg)
             free(t->task);
             t->task = NULL;
         }
-        t->state = IDLE;                //!< 线程设为空闲状态
+        t->state = THREAD_STATE_IDLE;   //!< 线程设为空闲状态
         if(pthread_mutex_unlock(&t->mutex)) {   //!< 线程结构体访问解锁
             dbg_outerr_W(DS_POOL_ERR, "pthread_mutex_unlock");
         }
     }
     p->thread_num--;
-    if(t->state == IDLE) {
+    if(t->state == THREAD_STATE_IDLE) {
         p->idle_thread_num--;
     }
-    list_del(&t->ptr);          //!< 从线程池列表中删除线程结构体
+    list_del(&t->ptr);                  //!< 从线程池列表中删除线程结构体
     if(pthread_mutex_destroy(&t->mutex)) {  //!< 销毁互斥锁
         dbg_outerr_W(DS_POOL_ERR, "pthread_mutex_destroy");
     }
@@ -149,7 +120,7 @@ static int thread_add(POOL_THREAD_T * p)
         return POOL_THREAD_RET_MEM;
     }
     memset(t, 0x00, sizeof(THREAD_T));
-    t->state = IDLE;
+    t->state = THREAD_STATE_IDLE;
     THREAD_ARG_T * arg = (THREAD_ARG_T *)malloc(sizeof(THREAD_ARG_T));
     if(arg == NULL) {
         dbg_outerr_E(DS_POOL_ERR, "malloc");
@@ -201,11 +172,11 @@ static int thread_del(POOL_THREAD_T * p, int force)
     else {
         list_for_each(ptr, &p->list_thread) {   //!< 遍历所有节点
             t = list_entry(ptr, THREAD_T, ptr);
-            if(t->state == IDLE) {
+            if(t->state == THREAD_STATE_IDLE) {
                 break;
             }
         }
-        if(t->state != IDLE) {
+        if(t->state != THREAD_STATE_IDLE) {
             dbg_out_W(DS_POOL_ERR, "Cancel thread: nothing to do");
             return POOL_THREAD_RET_NO_THREAD_CANCELED;
         }
@@ -223,7 +194,7 @@ static int thread_del(POOL_THREAD_T * p, int force)
     }
     list_del(&t->ptr);                  //!< 从线程池列表中删除线程结构体
     p->thread_num--;
-    if(t->state == IDLE) {
+    if(t->state == THREAD_STATE_IDLE) {
         p->idle_thread_num--;
     }
     if(t->task) {
@@ -240,7 +211,7 @@ static int thread_del(POOL_THREAD_T * p, int force)
 }
 /**
  * \brief       线程池管理器
- * \param       arg         线程池句柄
+ * \param       arg         线程池句柄指针
  * \detail      初始化时，函数本身作为线程池的一个任务，被添加到任务列表；
  *              将长期占用一个线程，直到线程池被销毁；
  *              线程池管理策略:
@@ -249,7 +220,7 @@ static int thread_del(POOL_THREAD_T * p, int force)
  */
 static void manager(void * arg)
 {
-    POOL_THREAD_T * p = (POOL_THREAD_T *)arg;
+    POOL_THREAD_T * p = *(POOL_THREAD_T **)arg;
     int interval_create = 0;
     int interval_destroy = 0;
     int interval_cond = 0;
@@ -309,7 +280,8 @@ static void manager(void * arg)
     dbg_out_I(DS_POOL, "Thread pool manager stop");
 }
 /** \brief       添加任务到列表 */
-int pool_thread_task_add(long hdl, char * name, void * arg, TASK_FUNC_T func)
+int pool_thread_task_add(long hdl, char * name, void * arg, int arg_len,
+        TASK_FUNC_T func)
 {
     POOL_THREAD_T * p = (POOL_THREAD_T *)hdl;
     if(p == NULL) {
@@ -318,15 +290,16 @@ int pool_thread_task_add(long hdl, char * name, void * arg, TASK_FUNC_T func)
     if(p->flag_halt) {
         return 0;                       //!< 准备销毁，不再添加任务
     }
-    TASK_T * t = (TASK_T *)malloc(sizeof(TASK_T));
+    TASK_T * t = (TASK_T *)malloc(sizeof(TASK_T) + arg_len);
     if(t == NULL) {
         dbg_outerr_E(DS_POOL_ERR, "malloc");
         return POOL_THREAD_RET_MEM;
     }
-    memset(t, 0x00, sizeof(TASK_T));
-    t->name = name;
-    t->arg = arg;
+    memset(t, 0x00, sizeof(TASK_T) + arg_len);
+    strncpy(t->name, name, sizeof(t->name));
     t->func = func;
+    t->arg_len = arg_len;
+    memmove(t->arg, arg, t->arg_len);
     if(pthread_mutex_lock(&p->mutex)) { //!< 线程池结构体访问上锁
         free(t);
         dbg_outerr_E(DS_POOL_ERR, "pthread_mutex_lock");
@@ -423,7 +396,7 @@ int pool_thread_new(long * hdl)
         p->flag_halt = 0;
 
         if((ret = pool_thread_task_add((long)p, "Thread pool manager",
-                        p, manager))) {
+                        &p, sizeof(POOL_THREAD_T *), manager))) {
             dbg_out_E(DS_POOL_ERR, "Create thread pool manager failed!");
             break;
         }

@@ -82,16 +82,16 @@ static int sock_server_init(SOCK_SERVER_T * p)
     return ret;
 }
 
-static int sock_server_routine(SOCK_SERVER_T * p)
-{
-    int fd_req;
-    struct epoll_event event;
-    struct epoll_event events[SOCK_EPOLL_EVENTS];
-    while(1) {
-        // fd_req = epoll_wait();
-    }
-    return 0;
-}
+// static int sock_server_routine(SOCK_SERVER_T * p)
+// {
+//     int fd_req;
+//     struct epoll_event event;
+//     struct epoll_event events[SOCK_EPOLL_EVENTS];
+//     while(1) {
+//         fd_req = epoll_wait();
+//     }
+//     return 0;
+// }
 
 int sock_svr_start(int port, long * hdl)
 {

@@ -3,7 +3,7 @@
 
 extern int test_bio(void *p);
 extern int test_ini(void *p);
-extern int test_buffer(void *p);
+extern int test_buf_queue(void *p);
 extern int test_thread(void *p);
 extern int test_server(void *p);
 
@@ -19,7 +19,7 @@ int main(int argc, char * argv[])
     dbg_test_setlist(
         { "bio",        NULL,   test_bio, },
         { "ini parse",  NULL,   test_ini, },
-        { "buffer",     NULL,   test_buffer, },
+        { "buf queue",  NULL,   test_buf_queue, },
         { "thread",     NULL,   test_thread, },
         { "server",     NULL,   test_server, },
         { "client",     NULL,   NULL, },

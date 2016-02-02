@@ -4,6 +4,8 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 typedef struct {
     int type;                           //!< 映射类型, BIO_SHM_TYPE_E
@@ -12,8 +14,7 @@ typedef struct {
     int fd;                             //!< shm_open返回的描述符
     long addr;                          //!< mmap返回的地址
 }BIO_SHM_HDL_T;
-
-int unix_shm_new(int type, char *name, unsigned int size, long *addr, long *hdl)
+static int unix_shm_new(int type, char *name, unsigned int size, long *hdl)
 {
     int ret = 0;
     int prot = PROT_READ | PROT_WRITE;
@@ -81,11 +82,11 @@ int unix_shm_new(int type, char *name, unsigned int size, long *addr, long *hdl)
         free(p);
     }
     else {
-        *addr = p->addr;
+        *hdl = (long)p;
     }
     return ret;
 }
-int unix_shm_del(long * hdl)
+static int unix_shm_del(long * hdl)
 {
     BIO_SHM_HDL_T * p = (BIO_SHM_HDL_T *)(*hdl);
     if(p == NULL) {
@@ -94,30 +95,66 @@ int unix_shm_del(long * hdl)
     }
     switch(p->type) {
         case SHM_TYPE_SHM: {
-            shm_unlink(p->name);
+            if(shm_unlink(p->name) < 0) {
+                dbg_outerr_W(DS_SHM_ERR, "shm_unlink");
+            }
             break;
         }
         case SHM_TYPE_FILE: {
-            close(p->fd);
+            if(close(p->fd) < 0) {
+                dbg_outerr_W(DS_SHM_ERR, "close");
+            }
+            if(remove(p->name) < 0) {
+                dbg_outerr_W(DS_SHM_ERR, "remove");
+            }
             break;
         }
         case SHM_TYPE_ANONYMOUS: {
             break;
         }
     }
-    munmap((void *)p->addr, p->size);
+    if(munmap((void *)p->addr, p->size) < 0) {
+        dbg_outerr_W(DS_SHM_ERR, "munmap");
+    }
     free(p);
     *hdl = (long)NULL;
     return 0;
+}
+static int unix_shm_size(long hdl)
+{
+    struct stat st;
+    BIO_SHM_HDL_T * p = (BIO_SHM_HDL_T *)hdl;
+    if(p->type == SHM_TYPE_ANONYMOUS) {
+        return p->size;
+    }
+    int ret = fstat(p->fd, &st);
+    if(ret < 0) {
+        dbg_outerr_E(DS_SHM_ERR, "fstat");
+        return -1;
+    }
+    if(st.st_size != p->size) {
+        dbg_out_I(DS_SHM, "Size no match!(%d != %d)", st.st_size, p->size);
+        if(ftruncate(p->fd, p->size) < 0) {
+            dbg_outerr_W(DS_SHM_ERR, "ftruncate");
+        }
+    }
+    return st.st_size;
+}
+static void * unix_shm_addr(long hdl)
+{
+    return (void *)((BIO_SHM_HDL_T *)hdl)->addr;
 }
 static BIO_SHM_T s_bio_shm_unix = {
     .desc       = "POSIX semaphore",
     .new        = unix_shm_new,
     .del        = unix_shm_del,
+    .size       = unix_shm_size,
+    .addr       = unix_shm_addr,
 };
 #endif /* defined(CFG_SYS_UNIX) */
 
 static BIO_SHM_T * s_bio_shm = NULL;
+
 int bio_shm_init(void * p)
 {
     if(p) {
