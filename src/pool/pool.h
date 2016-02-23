@@ -24,7 +24,11 @@ typedef enum {                          //!< 返回值定义
     POOL_THREAD_RET_NO_THREAD_CANCELED, //!< 没有可销毁的线程
     POOL_THREAD_RET_PARAM_ERR,          //!< 参数错误
 }POOL_THREAD_RET_E;
-typedef void (* TASK_FUNC_T)(void *);   //!< 任务接口函数指针
+/**
+ * \brief       任务接口函数类型
+ * \param       p       任务参数，通常是存储某个结构体的指针的地址
+ */
+typedef void (* TASK_FUNC_T)(void * p);
 typedef struct {                        //!< 任务结构体
     char name[32];                      //!< 任务名
     TASK_FUNC_T func;                   //!< 任务接口函数指针
@@ -76,6 +80,12 @@ int pool_thread_del(long * hdl);
  * \return      0:Success   <0:Error, POOL_THREAD_RET_E
  */
 int pool_thread_new(long * hdl);
+/**
+ * \brief       查看线程池运行状态
+ * \param       hdl         线程池句柄
+ * \return      false:Stoped    true:Running
+ */
+int pool_thread_run(long hdl);
 /** @} */
 
 

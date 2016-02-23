@@ -38,7 +38,7 @@
 #define DS_CONF_INI_ERR (DBG_INFO | DBG_LABEL_FUNC | DBG_LABEL_LINE)
 /// 缓存模块调试
 #define DS_BUF_QUEUE        0   // (DBG_INFO | DBG_LABEL_FUNC | DBG_LABEL_LINE)
-#define DS_BUF_QUEUE_ERR    0   // (DBG_INFO | DBG_LABEL_FUNC | DBG_LABEL_LINE)
+#define DS_BUF_QUEUE_ERR    (DBG_INFO | DBG_LABEL_FUNC | DBG_LABEL_LINE)
 /// 池模块调试
 #define DS_POOL         0   // (DBG_INFO | DBG_LABEL_FUNC | DBG_LABEL_LINE)
 #define DS_POOL_ERR     (DBG_INFO | DBG_LABEL_FUNC | DBG_LABEL_LINE)
@@ -55,7 +55,8 @@
 #define ERR_CODE_CONF_INI       -9800
 #define ERR_CODE_BUFFER         -9700
 #define ERR_CODE_POOL_THREAD    -9600
-#define ERR_CODE_SOCK           -9500
+#define ERR_CODE_PROCESSOR      -9500
+#define ERR_CODE_SOCK           -9400
 #define ERR_CODE_MAIN           -5400
 /** @} */
 /**
@@ -68,6 +69,7 @@
 #include "list/list.h"
 #include "../src/bio/bio.h"
 #include "../src/pool/pool.h"
+#include "../src/processor/processor.h"
 #include "../src/sock/sock.h"
 #include "../memwatch/memwatch.h"
 /// Utility modules

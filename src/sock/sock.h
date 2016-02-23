@@ -1,6 +1,7 @@
 #ifndef __SOCK_H__
 #define __SOCK_H__
 
+#define SOCK_AUTOCLOSE_IDLELINK_TIME_S  60  //!< 自动关闭空闲链接时间(秒)
 typedef enum {                          //!< 返回值定义
     SOCK_RET = ERR_CODE_SOCK,           //!< 起始码
     SOCK_RET_PARAM_ERR,                 //!< 参数错误
@@ -9,11 +10,53 @@ typedef enum {                          //!< 返回值定义
     SOCK_RET_BIND_ERR,                  //!< 监听失败
     SOCK_RET_LISTEN_ERR,                //!< 监听失败
     SOCK_RET_GET_EPOLLFD_ERR,           //!< 获取epoll描述符失败
-    SOCK_RET_EPOLL_CTL_ERR,             //!< 设置epoll失败
+    SOCK_RET_EPOLL_CTL_FD_SOCK_ERR,     //!< 套接口描述符设置监听失败
+    SOCK_RET_FCNTL_GETFL,               //!< 获取文件状态标记错误
+    SOCK_RET_FCNTL_SETFL,               //!< 设置文件状态标记错误
+
+    SOCK_RET_CLOSED,                    //!< 链接已被关闭
+    SOCK_RET_READ_ERR,                  //!< 读取错误
 }SOCK_RET_E;
-typedef struct {                        //!< 服务程序参数结构体
-    unsigned short int port;            //!< 端口号
-}SOCK_SVR_PARAM_T;
+typedef enum {                          //!< 连接状态类型
+    SOCK_LINK_STATE_IDLE,               //!< 空闲
+    SOCK_LINK_STATE_BUSY,               //!< 数据交互处理中
+    SOCK_LINK_STATE_DISCONNECT,         //!< 链接异常或被关闭
+}SOCK_LINK_STATE_E;
+/**
+ * \brief       链接数据读取回调函数类型
+ * \param       p           链接信息结构体指针
+ * \param       buf         数据缓存
+ * \param       count       期望读取的数据长度
+ * \return      >0:Read length; 0:No data; <0:Error, SOCK_RET_E
+ */
+typedef int (*SOCK_READ_T)(void * p, void * buf, size_t count);
+/**
+ * \brief       链接数据写入回调函数类型
+ * \param       p           链接信息结构体指针
+ * \param       buf         数据缓存
+ * \param       count       期望写入的数据长度
+ * \return      >=0:Write length; <0:Error, SOCK_RET_T
+ */
+typedef int (*SOCK_WRITE_T)(void * p, const void * buf, size_t count);
+/**
+ * \brief       链接数据处理后执行回调函数类型
+ * \param       p           链接信息结构体指针
+ * \param       state       设置退出后链接的状态, SOCK_LINK_STATE_E
+ * \return      0:Success   <0:Error
+ */
+typedef int (*SOCK_POSTPROCESS_T)(void * p, SOCK_LINK_STATE_E state);
+typedef struct {                        //!< 链接信息结构体
+    int fd_peer;                        //!< 通道端口文件描述符
+    int fd_epoll;                       //!< epoll文件描述符
+    int state;                          //!< 状态标记, SOCK_LINK_STATE_E
+    int lasttime;                       //!< 最后一次正常交互的时间
+    int process_type;                   //!< 数据处理类型
+    long process_param;                 //!< 数据处理参数结构体指针，仅用于给
+                                        //!<    processor存储临时参数
+    SOCK_READ_T read;                   //!< 数据读取回调函数
+    SOCK_WRITE_T write;                 //!< 数据写入回调函数
+    SOCK_POSTPROCESS_T postprocess;     //!< 数据后处理
+}SOCK_LINK_INFO_T;
 
 int sock_svr_start(int port, long * hdl);
 int sock_svr_stop(long * hdl);

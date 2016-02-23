@@ -7,12 +7,18 @@ extern int test_buf_queue(void *p);
 extern int test_thread(void *p);
 extern int test_server(void *p);
 
+long g_hdl_thread_pool = NULL;
+
 int main(int argc, char * argv[])
 {
     mwInit();
-    dbg_out_W(DS_TM, "TLS_SVR - module test");
+    dbg_out_I(DS_TM, "TLS_SVR - module test");
     if(main_init()) {
         dbg_out_E(DS_TM, "Main init failed!!!");
+        return -1;
+    }
+    if(pool_thread_new(&g_hdl_thread_pool)) {
+        dbg_out_E(DS_TM, "Thread pool init failed!!!");
         return -1;
     }
 
@@ -24,6 +30,7 @@ int main(int argc, char * argv[])
         { "server",     NULL,   test_server, },
         { "client",     NULL,   NULL, },
         );
+    pool_thread_del(&g_hdl_thread_pool);
 
     mwTerm();
     return 0;

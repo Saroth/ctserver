@@ -5,6 +5,7 @@ typedef struct {                        //!< 选项参数结构体
     
 }OPTS_T;
 extern OPTS_T g_opts;                   //!< 程序选项
+extern long g_hdl_thread_pool;          //!< 线程池句柄
 
 /**
  * \brief       程序基本初始化, Must be the first!

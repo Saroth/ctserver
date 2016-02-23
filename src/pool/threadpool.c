@@ -417,4 +417,10 @@ int pool_thread_new(long * hdl)
     free(p);
     return ret;
 }
+/** \brief       查看线程池运行状态 */
+inline int pool_thread_run(long hdl)
+{
+    POOL_THREAD_T * p = (POOL_THREAD_T *)hdl;
+    return (p->flag_halt == 0);
+}
 
