@@ -15,7 +15,8 @@ typedef enum {                          //!< 返回值定义
     SOCK_RET_FCNTL_SETFL,               //!< 设置文件状态标记错误
 
     SOCK_RET_CLOSED,                    //!< 链接已被关闭
-    SOCK_RET_READ_ERR,                  //!< 读取错误
+    SOCK_RET_READ_ERR,                  //!< 读错误
+    SOCK_RET_WRITE_ERR,                 //!< 写错误
 }SOCK_RET_E;
 typedef enum {                          //!< 连接状态类型
     SOCK_LINK_STATE_IDLE,               //!< 空闲
@@ -28,6 +29,8 @@ typedef enum {                          //!< 连接状态类型
  * \param       buf         数据缓存
  * \param       count       期望读取的数据长度
  * \return      >0:Read length; 0:No data; <0:Error, SOCK_RET_E
+ * \detail      count可能比实际可读取量大，所以读完数据立即返回
+ *              读取错误则关闭链接
  */
 typedef int (*SOCK_READ_T)(void * p, void * buf, size_t count);
 /**
@@ -36,6 +39,7 @@ typedef int (*SOCK_READ_T)(void * p, void * buf, size_t count);
  * \param       buf         数据缓存
  * \param       count       期望写入的数据长度
  * \return      >=0:Write length; <0:Error, SOCK_RET_T
+ * \detail      只有在count长度的数据都发送完成才成功，否则报错并关闭链接
  */
 typedef int (*SOCK_WRITE_T)(void * p, const void * buf, size_t count);
 /**
@@ -47,15 +51,15 @@ typedef int (*SOCK_WRITE_T)(void * p, const void * buf, size_t count);
 typedef int (*SOCK_POSTPROCESS_T)(void * p, SOCK_LINK_STATE_E state);
 typedef struct {                        //!< 链接信息结构体
     int fd_peer;                        //!< 通道端口文件描述符
-    int fd_epoll;                       //!< epoll文件描述符
-    int state;                          //!< 状态标记, SOCK_LINK_STATE_E
+    int state;                          //!< 链接状态标记, SOCK_LINK_STATE_E
     int lasttime;                       //!< 最后一次正常交互的时间
     int process_type;                   //!< 数据处理类型
     long process_param;                 //!< 数据处理参数结构体指针，仅用于给
                                         //!<    processor存储临时参数
+    long svr;                           //!< 服务器参数结构体指针
     SOCK_READ_T read;                   //!< 数据读取回调函数
     SOCK_WRITE_T write;                 //!< 数据写入回调函数
-    SOCK_POSTPROCESS_T postprocess;     //!< 数据后处理
+    SOCK_POSTPROCESS_T postproc;        //!< 数据后处理
 }SOCK_LINK_INFO_T;
 
 int sock_svr_start(int port, long * hdl);

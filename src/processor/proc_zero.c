@@ -10,12 +10,17 @@ static void proc(void * p)
         if(ret <= 0) {
             break;
         }
+        memset(buf, 0x00, ret);
+        ret = info->write(info, buf, ret);
+        if(ret <= 0) {
+            break;
+        }
     }
     info->postproc(info, SOCK_LINK_STATE_IDLE);
 }
 
-PROC_T g_proc_null = {
-    .name       = "null",
+PROC_T g_proc_zero = {
+    .name       = "zero",
     .process    = proc,
     .close      = NULL,
 };

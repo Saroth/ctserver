@@ -6,6 +6,7 @@ extern int test_ini(void *p);
 extern int test_buf_queue(void *p);
 extern int test_thread(void *p);
 extern int test_server(void *p);
+extern int test_processor(void *p);
 
 long g_hdl_thread_pool = NULL;
 
@@ -29,6 +30,7 @@ int main(int argc, char * argv[])
         { "thread",     NULL,   test_thread, },
         { "server",     NULL,   test_server, },
         { "client",     NULL,   NULL, },
+        { "processor",  NULL,   test_processor, },
         );
     pool_thread_del(&g_hdl_thread_pool);
 

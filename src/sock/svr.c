@@ -50,13 +50,14 @@ static int set_nonblocking(int fd)
 static int sock_close(void * p)
 {
     SOCK_LINK_INFO_T * info = (SOCK_LINK_INFO_T *)p;
+    SOCK_SERVER_T * svr = (SOCK_SERVER_T *)info->svr;
     if(info == NULL) {
         return 0;
     }
     if(g_processors[info->process_type]->close) {   //!< 释放数据处理任务
         g_processors[info->process_type]->close(info);
     }
-    if(epoll_ctl(info->fd_epoll, EPOLL_CTL_DEL, info->fd_peer, NULL)) {
+    if(epoll_ctl(svr->fd_epoll, EPOLL_CTL_DEL, info->fd_peer, NULL)) {
         dbg_outerr_W(DS_SERVER_ERR, "epoll_ctl, DEL");
     }
     if(close(info->fd_peer)) {          //!< 关闭套接口
@@ -69,35 +70,29 @@ static int sock_close(void * p)
 /** \brief       数据读取处理回调函数类型, SOCK_READ_T */
 static int sock_read(void * p, void * buf, size_t count)
 {
-    int ret = 0;
-    int c = 0;
     SOCK_LINK_INFO_T * info = (SOCK_LINK_INFO_T *)p;
+    SOCK_SERVER_T * svr = (SOCK_SERVER_T *)info->svr;
     if(info == NULL) {
         return 0;
     }
-    while(pool_thread_run(g_hdl_thread_pool)) {
-        ret = read(info->fd_peer, buf + c, count - c);
-        if(ret <= 0) {
-            break;
-        }
-        c += ret;
-        if(c >= count) {
-            break;
-        }
+    int ret = 0;
+    int n = 0;
+    while(svr->state == SOCK_SVR_STATE_RUNNING
+            && pool_thread_run(g_hdl_thread_pool)
+            && ret < count
+            && (n = read(info->fd_peer, buf + ret, count - ret)) > 0) {
+        ret += n;
     }
-    if(c > 0) {
+    if(ret > 0) {
         info->lasttime = time(NULL);
-        return c;                       //!< 有读到数据，直接返回，不处理错误
+        return ret;                     //!< 读到数据直接返回，不处理错误
     }
-    if(ret < 0) {
-        if(errno == EAGAIN) {
-            return 0;                   //!< 无数据
-        }
+    if(n < 0 && errno != EAGAIN && errno != EINTR) {
         dbg_outerr_W(DS_SERVER_ERR, "read");
-        ret = SOCK_RET_READ_ERR;        //!< 读取错误
+        ret = SOCK_RET_READ_ERR;        //!< 读错误
     }
-    else if(ret == 0) {
-        ret = SOCK_RET_CLOSED;          //!< 对方已关闭链接
+    else if(n == 0) {
+        ret = SOCK_RET_CLOSED;          //!< 对方已关闭链接 或 准备停止
     }
     info->state = SOCK_LINK_STATE_DISCONNECT;   //!< 准备关闭套接口
     return ret;
@@ -106,11 +101,28 @@ static int sock_read(void * p, void * buf, size_t count)
 static int sock_write(void * p, const void * buf, size_t count)
 {
     SOCK_LINK_INFO_T * info = (SOCK_LINK_INFO_T *)p;
+    SOCK_SERVER_T * svr = (SOCK_SERVER_T *)info->svr;
     if(info == NULL) {
         return 0;
     }
-    info->lasttime = time(NULL);
-    return 0;
+    int ret = 0;
+    int n = 0;
+    while(svr->state == SOCK_SVR_STATE_RUNNING
+            && pool_thread_run(g_hdl_thread_pool)
+            && ret < count
+            && (n = write(info->fd_peer, buf + ret, count - ret)) > 0) {
+        ret += n;
+    }
+    if(ret == count) {
+        info->lasttime = time(NULL);    //!< 写成功
+        return ret;
+    }
+    else {
+        dbg_outerr_E(DS_SERVER_ERR, "write");
+        ret = SOCK_RET_WRITE_ERR;       //!< 写错误
+        info->state = SOCK_LINK_STATE_DISCONNECT;   //!< 准备关闭套接口
+    }
+    return ret;
 }
 /** \brief       链接数据处理后执行回调函数类型, SOCK_POSTPROCESS_T */
 static int sock_postprocess(void * p, SOCK_LINK_STATE_E state)
@@ -240,14 +252,14 @@ static void sock_accept(void * arg)
         }
         memset(info, 0x00, sizeof(SOCK_LINK_INFO_T));
         info->fd_peer = fd;
-        info->fd_epoll = p->fd_epoll;
         info->state = SOCK_LINK_STATE_IDLE;
         info->lasttime = time(NULL);
         info->process_type = g_processor_type_cur;
         info->process_param = 0;
+        info->svr = (long)p;
         info->read = sock_read;
         info->write = sock_write;
-        info->postprocess = sock_postprocess;
+        info->postproc = sock_postprocess;
         e.data.ptr = info;          //!< 添加端口事件监听
         e.events = EPOLLIN | EPOLLET;
         int ret = epoll_ctl(p->fd_epoll, EPOLL_CTL_ADD, fd, &e);
@@ -262,7 +274,7 @@ static void sock_accept(void * arg)
 /**
  * \brief       线程任务，服务端流程
  * \param       p           服务器参数结构体指针
- * \detail      将长期占用一个线程，直到服务器被暂停或线程池被销毁
+ * \detail      将长期占用一个线程，直到服务器被停止或线程池被销毁
  */
 static void sock_server_routine(void * arg)
 {
@@ -282,6 +294,7 @@ static void sock_server_routine(void * arg)
                 //!< 添加监听任务到线程池，创建监听线程
                 pool_thread_task_add(g_hdl_thread_pool, "Server accepter",
                         p, sizeof(SOCK_SERVER_T *), sock_accept);
+                continue;
             }
             if(events[i].events & EPOLLIN) {    //!< 其他套接口的读取事件
                 SOCK_LINK_INFO_T * info
@@ -291,7 +304,7 @@ static void sock_server_routine(void * arg)
                     //!<    循环时能继续处理数据，需要改为水平触发模式
                     if(events[i].events & EPOLLET) {
                         events[i].events = EPOLLIN;
-                        if(epoll_ctl(info->fd_epoll, EPOLL_CTL_MOD,
+                        if(epoll_ctl(p->fd_epoll, EPOLL_CTL_MOD,
                                     info->fd_peer, &events[i])) {
                             dbg_outerr_W(DS_SERVER_ERR, "epoll_ctl, MOD");
                         }
@@ -300,7 +313,7 @@ static void sock_server_routine(void * arg)
                 }
                 if(!(events[i].events & EPOLLET)) {
                     events[i].events = EPOLLIN | EPOLLET;   //!< 恢复为边缘触发
-                    if(epoll_ctl(info->fd_epoll, EPOLL_CTL_MOD,
+                    if(epoll_ctl(p->fd_epoll, EPOLL_CTL_MOD,
                                 info->fd_peer, &events[i])) {
                         dbg_outerr_W(DS_SERVER_ERR, "epoll_ctl, MOD");
                     }
@@ -322,12 +335,15 @@ static void sock_server_routine(void * arg)
             }
             if((events[i].events & EPOLLERR)
                     || (events[i].events & EPOLLHUP)
+                    || (events[i].events & EPOLLRDHUP)
                     || (!events[i].events & EPOLLIN)) { //!< 异常链接，关闭
                 dbg_out_W(DS_SERVER_ERR, "Link error, close.");
                 sock_close(events[i].data.ptr);
+                continue;
             }
         }
     }
+    //!< 退出操作
 }
 
 int sock_svr_start(int port, long * hdl)
